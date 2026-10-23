@@ -181,6 +181,7 @@ button{cursor:pointer}
 .toggle.four{grid-template-columns:repeat(4,minmax(0,1fr))}
 .toggle.four button{font-size:13px}
 .toggle.five{grid-template-columns:repeat(3,minmax(0,1fr))}
+#oClase button{font-size:13px;padding:0 2px}
 
 /* quesito */
 .pie-wrap{display:grid;place-items:center}
@@ -684,13 +685,9 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     <div class="grip"></div>
     <h3 id="tProd">Nuevo producto</h3>
     <div class="field"><label for="prNombre">Nombre</label><input id="prNombre" maxlength="60" autocomplete="off" placeholder="Ej. Vanguard Global Stock Index"></div>
-    <div class="two">
-      <div class="field"><label for="prIsin">ISIN</label><input id="prIsin" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="IE00B03HCZ61"></div>
-      <div class="field"><label for="prTipo">Tipo</label>
-        <select id="prTipo"><option value="fondo">Fondo indexado</option><option value="etf">ETF</option><option value="inmueble">Inmueble</option><option value="otro">Otro</option></select>
-      </div>
+    <div class="field"><label for="prTipo">Tipo</label>
+      <select id="prTipo"><option value="fondo">Fondo indexado</option><option value="etf">ETF</option><option value="accion">Acción</option><option value="inmueble">Inmueble</option><option value="otro">Otro</option></select>
     </div>
-    <div class="field" id="prTickerWrap"><label for="prTicker">Ticker o mercado (opcional)</label><input id="prTicker" maxlength="24" autocomplete="off" placeholder="Ej. IWDA · Ámsterdam"></div>
     <p class="note" id="prTipoNote"></p>
     <div id="prDetalle" class="panel" style="gap:14px"></div>
     <p class="err" id="prErr" role="alert"></p>
@@ -707,20 +704,24 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   <form class="sheet" id="formOp" role="dialog" aria-modal="true" aria-labelledby="tOp" novalidate>
     <div class="grip"></div>
     <h3 id="tOp">Nueva operación</h3>
+    <div class="toggle three" id="oClase" style="grid-template-columns:1.8fr 1fr .7fr">
+      <button type="button" data-v="bolsa" aria-pressed="true">Fondos, ETF, acciones</button>
+      <button type="button" data-v="inmueble" aria-pressed="false">Inmueble</button>
+      <button type="button" data-v="otro" aria-pressed="false">Otro</button>
+    </div>
     <div class="toggle four" id="oTipo">
       <button type="button" data-v="compra" aria-pressed="true">Compra</button>
       <button type="button" data-v="venta" aria-pressed="false">Venta</button>
       <button type="button" data-v="aportacion" aria-pressed="false">Aportación</button>
       <button type="button" data-v="dividendo" aria-pressed="false">Dividendo</button>
     </div>
-    <div class="field"><label for="oProd">Producto</label><select id="oProd"></select></div>
-    <div class="two eq" id="oUPWrap">
-      <div class="field"><label for="oUnid">Participaciones</label><input id="oUnid" inputmode="decimal" autocomplete="off" placeholder="Ej. 12,3456"></div>
-      <div class="field"><label for="oPrecio">Precio por participación</label><input id="oPrecio" inputmode="decimal" autocomplete="off" placeholder="Ej. 41,27"></div>
-    </div>
+    <div class="field"><label for="oProd" id="oProdLbl">Producto</label><select id="oProd"></select></div>
+    <button type="button" class="btn small" id="oNuevoProd" style="align-self:flex-start" hidden>Crear producto</button>
+    <div class="field" id="oConceptoWrap" hidden><label for="oConcepto">¿Qué estás pagando?</label><select id="oConcepto"><option value="entrada">Entrada o plazo</option><option value="impuestos">Impuestos (ITP, IVA, AJD)</option><option value="notaria">Notaría, registro y gestoría</option><option value="reforma">Reforma o mobiliario</option><option value="otros">Otros gastos de compra</option></select></div>
     <div class="two eq">
-      <div class="field" id="oComWrap"><label for="oCom">Comisión</label><input id="oCom" inputmode="decimal" autocomplete="off" placeholder="0"></div>
-      <div class="field" id="oImpWrap" hidden><label for="oImp">Importe</label><input id="oImp" inputmode="decimal" autocomplete="off" placeholder="0,00"></div>
+      <div class="field" id="oImpWrap"><label for="oImp" id="oImpLbl">Importe</label><input id="oImp" inputmode="decimal" autocomplete="off" placeholder="0,00"></div>
+      <div class="field" id="oUnidWrap"><label for="oUnid">Participaciones</label><input id="oUnid" inputmode="decimal" autocomplete="off" placeholder="Ej. 12,3456"></div>
+      <div class="field" id="oComWrap"><label for="oCom">Comisión (incluida)</label><input id="oCom" inputmode="decimal" autocomplete="off" placeholder="0"></div>
       <div class="field"><label for="oFecha">Fecha</label><input id="oFecha" type="date"></div>
     </div>
     <p class="note" id="oTotal"></p>
@@ -1268,8 +1269,13 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   }
 
   /* ---------- cálculos: inversiones ---------- */
-  const TIPOS_PROD = {fondo:'Fondo indexado', etf:'ETF', inmueble:'Inmueble', otro:'Otro'};
-  const cotiza = p => !!p && (p.tipo==='fondo' || p.tipo==='etf');
+  const TIPOS_PROD = {fondo:'Fondo indexado', etf:'ETF', accion:'Acción', inmueble:'Inmueble', otro:'Otro'};
+  const cotiza = p => !!p && ['fondo','etf','accion'].includes(p.tipo);
+  const CLASES = {bolsa:'Fondos, ETF y acciones', inmueble:'Inmuebles', otro:'Otros'};
+  const claseDeProd = p => !p ? 'bolsa' : cotiza(p) ? 'bolsa' : p.tipo==='inmueble' ? 'inmueble' : 'otro';
+  const CONCEPTOS_INM = {entrada:'Entrada o plazo', impuestos:'Impuestos (ITP, IVA, AJD)', notaria:'Notaría, registro y gestoría', reforma:'Reforma o mobiliario', otros:'Otros gastos de compra'};
+  const TIPOS_CLASE = {bolsa:['compra','venta','dividendo'], inmueble:['aportacion'], otro:['aportacion','dividendo']};
+  const tipoProdDeClase = c => c==='inmueble' ? 'inmueble' : c==='otro' ? 'otro' : 'fondo';
   const catDeProd = p => !p ? 'n_inv' : p.tipo==='inmueble' ? 'inv_inmu' : p.tipo==='otro' ? 'n_inv' : 'inv_bolsa';
   const prodById = id => state.productos.find(p => p.id===id) || null;
   const ordenFecha = (a,b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : (a.creado||0) - (b.creado||0);
@@ -1355,9 +1361,9 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
       flowsT: flows});
     pcMap.set(p.id, out); return out;
   }
-  function cartera(){
+  function cartera(filtro){
     let valor = 0, coste = 0, flows = [], sinPrecio = 0, viejos = 0, revisar = 0, ultimaFecha = null, ultimaFuente = null, porTipo = {bolsa:0, inmuebles:0, otros:0};
-    state.productos.forEach(p => {
+    (filtro ? state.productos.filter(filtro) : state.productos).forEach(p => {
       const c = prodCalc(p); valor += c.valor; coste += c.coste; flows = flows.concat(c.flows);
       if(c.sinPrecio) sinPrecio++; if(c.viejo) viejos++; if(c.revisar) revisar++;
       if(c.precio && cotiza(p) && (!ultimaFecha || c.precio.fecha > ultimaFecha)){ ultimaFecha = c.precio.fecha; ultimaFuente = c.precio.origen; }
@@ -1374,7 +1380,8 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     state.productos.forEach(p => prodCalc(p).realized.forEach(x => { const y = x.fecha.slice(0,4); (r[y] = r[y] || {gan:0, n:0, falta:false}); r[y].gan += x.gan; r[y].n++; if(x.falta) r[y].falta = true; }));
     return r;
   }
-  function valorInversionesEn(iso){ return state.productos.reduce((s,p) => s + valorDe(p, replay(p.id, iso), iso).valor, 0); }
+  function sinDetalleHasta(iso){ return state.movs.reduce((s,m) => s + (tipoDe(m)==='aportacion' && m.fecha && m.fecha <= iso ? (m.importe||0) : 0), 0); }
+  function valorInversionesEn(iso){ return state.productos.reduce((s,p) => s + valorDe(p, replay(p.id, iso), iso).valor, 0) + sinDetalleHasta(iso); }
   function serieMeses(max){
     const act = mesDe(hoyISO());
     let primero = act;
@@ -1388,7 +1395,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     const act = mesDe(hoyISO()), hoy = hoyISO();
     return serieMeses(max).map(ym => { const f = ym===act ? hoy : finMes(ym); const liq = liquidezHasta(f), inv = valorInversionesEn(f); return {ym, liq, inv, total: liq+inv}; });
   }
-  const patrimonioHoy = () => liquidezHasta(hoyISO()) + cartera().valor;
+  const patrimonioHoy = () => liquidezHasta(hoyISO()) + cartera().valor + sinDetalleHasta(hoyISO());
   function rendimientoTxt(c){
     if(c.dias >= 365 && c.tir != null) return {k:'TIR anual', v: fmtPct(c.tir, true), n: c.tir};
     if(c.total != null) return {k:'Rentabilidad total', v: fmtPct(c.total, true), n: c.total};
@@ -1532,7 +1539,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   const OP_TXT = {compra:'Compra', venta:'Venta', aportacion:'Aportación', retirada:'Retirada', dividendo:'Dividendo'};
   function filaOp(o, conCuenta){
     const p = prodById(o.producto), entra = o.tipo==='venta' || o.tipo==='retirada' || o.tipo==='dividendo';
-    let sub = OP_TXT[o.tipo] || o.tipo;
+    let sub = (o.tipo==='aportacion' && o.concepto && CONCEPTOS_INM[o.concepto]) ? CONCEPTOS_INM[o.concepto] : (OP_TXT[o.tipo] || o.tipo);
     if(o.unidades) sub += ' · ' + fmtU(o.unidades) + ' × ' + fmtP(o.precio);
     if(conCuenta) sub += o.cuenta ? (entra ? ' · a ' : ' · desde ') + cuentaById(o.cuenta).nombre : ' · sin cuenta';
     return `<button type="button" class="row" data-k="o" data-id="${esc(o.id)}" style="--c:var(--inv)"><i class="dot diamond"></i><span class="what"><b>${esc(o.nota || (p ? p.nombre : 'Producto borrado'))}</b><small>${esc(sub)}</small></span><span class="amt ${entra?'pos':'inv'}">${entra?'+':'−'}${esc(fmt(o.importe))}</span></button>`;
@@ -1865,46 +1872,72 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   /* ---------- Inversiones: Resumen ---------- */
   const PAL = n => 'var(--s' + (n % 8) + ')';
   RENDER.resumen = function(){
-    const hoy = hoyISO(), liq = liquidezHasta(hoy), cart = cartera(), pat = liq + cart.valor;
+    const hoy = hoyISO(), liq = liquidezHasta(hoy), cart = cartera(), sd = sinDetalleHasta(hoy), pat = liq + cart.valor + sd;
     $('patHero').textContent = fmt(pat); $('patHero').classList.toggle('neg', pat < 0);
-    $('patSub').innerHTML = `Cuentas <b class="num">${esc(fmt(liq))}</b> · Inversiones <b class="num">${esc(fmt(cart.valor))}</b>`;
+    $('patSub').innerHTML = `Cuentas <b class="num">${esc(fmt(liq))}</b> · Inversiones <b class="num">${esc(fmt(cart.valor + sd))}</b>`;
     const body = $('invBody');
-    if(!state.productos.length){
-      body.innerHTML = `<div class="empty"><strong>Añade tus productos</strong><span>Crea cada fondo o ETF con su ISIN y registra tus compras con participaciones y precio. Para lo que ya tenías, usa "Ninguna" como cuenta de cargo para no restar dos veces del saldo. La entrada del piso puede ir como producto de tipo Inmueble, con aportaciones.</span><button type="button" class="btn small primary" data-act="addprod">Añadir producto</button></div>`;
+    if(!state.productos.length && !sd){
+      body.innerHTML = `<div class="empty"><strong>Añade tus productos</strong><span>Crea tus fondos, ETF o acciones y registra cada compra con el importe y las participaciones. La entrada del piso va como Inmueble: cada plazo, impuesto o gasto es una aportación. Para lo que ya tenías, usa "Ninguna" como cuenta de cargo para no restar dos veces del saldo.</span><button type="button" class="btn small primary" data-act="addprod">Añadir producto</button></div>`;
       return;
     }
-    const rend = rendimientoTxt(cart), real = realizadasPorAnio(), y = hoy.slice(0,4), ry = real[y];
-    const imp = impuestoAhorro(cart.gan);
-    let avisos = [];
-    if(cart.revisar) avisos.push(`<span class="chip warn">${cart.revisar} precio${cart.revisar>1?'s':''} por revisar</span>`);
-    if(cart.sinPrecio) avisos.push(`<span class="chip warn">${cart.sinPrecio} sin precio: valorado${cart.sinPrecio>1?'s':''} a coste</span>`);
-    if(cart.viejos) avisos.push(`<span class="chip">${cart.viejos} con precio de hace más de 40 días</span>`);
+    const real = realizadasPorAnio(), y = hoy.slice(0,4), ry = real[y];
     const serie = seriePatrimonio(24);
     const filas = state.productos.map(p => ({p, c:prodCalc(p)})).filter(x => x.c.valor > 0).sort((a,b) => b.c.valor - a.c.valor);
     const totV = filas.reduce((s,x) => s + x.c.valor, 0);
-    body.innerHTML = `<div class="card">
-        <div class="eyebrow">Tus inversiones</div>
+    const prodsDe = cl => state.productos.filter(p => claseDeProd(p)===cl);
+    let html = '';
+    if(prodsDe('bolsa').length){
+      const cb = cartera(p => claseDeProd(p)==='bolsa'), rend = rendimientoTxt(cb), imp = impuestoAhorro(cb.gan), avisos = [];
+      if(cb.revisar) avisos.push(`<span class="chip warn">${cb.revisar} precio${cb.revisar>1?'s':''} por revisar</span>`);
+      if(cb.sinPrecio) avisos.push(`<span class="chip warn">${cb.sinPrecio} sin valor actualizado: a coste</span>`);
+      if(cb.viejos) avisos.push(`<span class="chip">${cb.viejos} con valor de hace más de 40 días</span>`);
+      html += `<div class="card">
+        <div class="eyebrow">Fondos, ETF y acciones</div>
         <div class="kpis">
-          <div class="kpi"><span class="k">Valor actual</span><span class="v inv">${esc(fmt(cart.valor))}</span><small>coste ${esc(fmt(cart.coste))}</small></div>
-          <div class="kpi"><span class="k">Ganancia sin vender</span><span class="v ${cart.gan<0?'neg':'pos'}">${esc(fmtS(cart.gan))}</span><small>${esc(fmtPct(cart.ganPct, true))} sobre lo que pusiste</small></div>
+          <div class="kpi"><span class="k">Valor actual</span><span class="v inv">${esc(fmt(cb.valor))}</span><small>coste ${esc(fmt(cb.coste))}</small></div>
+          <div class="kpi"><span class="k">Ganancia sin vender</span><span class="v ${cb.gan<0?'neg':'pos'}">${esc(fmtS(cb.gan))}</span><small>${esc(fmtPct(cb.ganPct, true))} sobre lo que pusiste</small></div>
           <div class="kpi"><span class="k">${esc(rend.k)}</span><span class="v ${rend.n<0?'neg':'pos'}">${esc(rend.v)}</span><small>${rend.k==='TIR anual' ? 'tiene en cuenta cuándo aportaste' : 'menos de un año: sin anualizar'}</small></div>
           <div class="kpi"><span class="k">Impuesto si vendieras hoy</span><span class="v">${esc(fmt(imp))}</span><small>estimado, escala del ahorro</small></div>
         </div>
         ${ry ? `<div class="planrow"><span>Ganancias realizadas en ${y} (FIFO)</span><b class="num ${ry.gan<0?'neg':'pos'}">${esc(fmtS(ry.gan))}</b></div>` : ''}
         ${avisos.length ? `<div class="chips">${avisos.join('')}</div>` : ''}
-        <p class="note">${cart.ultimaFecha ? `Último precio: ${esc(fechaCorta(cart.ultimaFecha))}. ` : ''}Los precios los pones tú en cada producto; el de cada compra o venta también cuenta.</p>
-      </div>
-      <div class="card">
+        <p class="note">${cb.ultimaFecha ? `Último valor: ${esc(fechaCorta(cb.ultimaFecha))}. ` : ''}Actualiza el valor de cada producto en su ficha; cada compra o venta también lo actualiza.</p>
+      </div>`;
+    }
+    const inm = prodsDe('inmueble');
+    if(inm.length){
+      const fi = inm.map(p => { const c = prodCalc(p), por = {}; opsDe(p.id).forEach(o => { if(o.tipo==='aportacion'){ const k = CONCEPTOS_INM[o.concepto] ? o.concepto : 'entrada'; por[k] = (por[k]||0) + o.importe; } }); return {p, c, por}; });
+      const puesto = fi.reduce((s,x) => s + x.c.coste, 0), valI = fi.reduce((s,x) => s + x.c.valor, 0);
+      html += `<div class="card">
+        <div class="eyebrow">Inmuebles</div>
+        <div class="kpis">
+          <div class="kpi"><span class="k">Has puesto</span><span class="v inv">${esc(fmt(puesto))}</span><small>entrada, impuestos y gastos</small></div>
+          <div class="kpi"><span class="k">Valor</span><span class="v">${esc(fmt(valI))}</span><small>${fi.some(x => x.c.precio) ? 'con tu valor estimado' : 'por lo que has puesto'}</small></div>
+        </div>
+        ${fi.map(x => `<div class="plansum"><div class="planrow"><span style="color:var(--ink);font-weight:600">${esc(x.p.nombre)}</span><b class="num">${esc(fmt(x.c.coste))}</b></div>${Object.keys(CONCEPTOS_INM).filter(k => x.por[k]).map(k => `<div class="planrow"><span>${esc(CONCEPTOS_INM[k])}</span><span class="num">${esc(fmt(x.por[k]))}</span></div>`).join('')}</div>`).join('')}
+        <p class="note">Se valora por lo que has puesto hasta que indiques un valor estimado en su ficha. No entra en la rentabilidad de la bolsa.</p>
+      </div>`;
+    }
+    const otros = prodsDe('otro');
+    if(otros.length){
+      html += `<div class="card"><div class="eyebrow">Otros</div><div class="rank">${otros.map(p => { const c = prodCalc(p); return `<div class="r" style="--c:var(--s-otros)"><i class="dot"></i><span class="n">${esc(p.nombre)}</span><span class="a">${esc(fmt(c.valor))}</span><span class="d">${c.precio ? 'estimado' : 'aportado'}</span></div>`; }).join('')}</div></div>`;
+    }
+    if(sd){
+      const porCat = {}; state.movs.forEach(m => { if(tipoDe(m)==='aportacion' && m.fecha && m.fecha <= hoy) porCat[m.cat] = (porCat[m.cat]||0) + (m.importe||0); });
+      html += `<div class="card"><div class="eyebrow">Sin producto</div><div class="rank">${Object.entries(porCat).sort((a,b) => b[1]-a[1]).map(([c,v]) => `<div class="r" style="--c:var(--s-otros)"><i class="dot diamond"></i><span class="n">${esc(catById(c).nombre)}</span><span class="a">${esc(fmt(v))}</span><span class="d"></span></div>`).join('')}</div><p class="note">Lo apuntado en Control de gastos sin producto, como la fila Inversiones de tu Numbers. Suma a tu patrimonio por lo aportado. Para seguir su valor, ábrelo en Control de gastos y pásalo a Inversiones.</p></div>`;
+    }
+    html += `<div class="card">
         <div class="eyebrow">Evolución del patrimonio</div>
         <div class="chart" id="patChart"></div>
         <div class="legend-line"><span><i class="ln"></i>Patrimonio neto</span><span><i class="sq" style="--c:var(--inv)"></i>Inversiones</span></div>
       </div>
-      <div class="card">
+      ${filas.length ? `<div class="card">
         <div class="eyebrow">Reparto</div>
         <div class="alloc">${filas.map((x,i) => `<i style="--c:${PAL(i)};width:${(x.c.valor/totV*100).toFixed(2)}%" title="${esc(x.p.nombre)}"></i>`).join('')}</div>
         <div class="rank">${filas.map((x,i) => `<div class="r" style="--c:${PAL(i)}"><i class="dot"></i><span class="n">${esc(x.p.nombre)}</span><span class="a">${esc(fmt(x.c.valor))}</span><span class="d">${esc((x.c.valor/totV*100).toLocaleString('es-ES',{maximumFractionDigits:1}))} %</span></div>`).join('')}</div>
-        ${[['bolsa','Bolsa'],['inmuebles','Inmuebles'],['otros','Otros']].filter(([k]) => cart.porTipo[k]).map(([k,n]) => `<div class="planrow"><span>${n}</span><b class="num">${esc(fmt(cart.porTipo[k]))} · ${esc(fmtPct(cart.valor ? cart.porTipo[k]/cart.valor : null))}</b></div>`).join('')}
-      </div>`;
+        ${[['bolsa','Fondos, ETF y acciones'],['inmuebles','Inmuebles'],['otros','Otros']].filter(([k]) => cart.porTipo[k]).map(([k,n]) => `<div class="planrow"><span>${n}</span><b class="num">${esc(fmt(cart.porTipo[k]))} · ${esc(fmtPct(cart.valor ? cart.porTipo[k]/cart.valor : null))}</b></div>`).join('')}
+      </div>` : ''}`;
+    body.innerHTML = html;
     dibujarPatrimonio(serie);
   };
   function dibujarPatrimonio(serie){
@@ -1931,20 +1964,22 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     const lista = state.productos.slice().sort((a,b) => (a.archivado?1:0) - (b.archivado?1:0) || prodCalc(b).valor - prodCalc(a).valor);
     $('nProd').textContent = lista.length ? lista.length + (lista.length===1 ? ' producto' : ' productos') : '';
     if(!lista.length){
-      $('prodList').innerHTML = `<div class="empty"><strong>Aún no hay productos</strong><span>Añade cada fondo o ETF con su ISIN y registra tus compras con participaciones y precio.</span></div>`;
+      $('prodList').innerHTML = `<div class="empty"><strong>Aún no hay productos</strong><span>Añade tus fondos, ETF o acciones y registra cada compra con el importe y las participaciones.</span></div>`;
     } else {
-      $('prodList').innerHTML = lista.map(p => {
+      const tarjeta = p => {
         const c = prodCalc(p), chips = [];
         chips.push(`<span class="chip inv">${esc(TIPOS_PROD[p.tipo] || 'Otro')}</span>`);
         if(p.archivado) chips.push(`<span class="chip">Archivado</span>`);
         if(c.revisar) chips.push(`<span class="chip warn">Revisar precio</span>`);
-        if(c.sinPrecio) chips.push(`<span class="chip warn">Sin precio</span>`);
-        if(c.viejo) chips.push(`<span class="chip">Precio antiguo</span>`);
-        const meta = cotiza(p) ? (c.unidades ? `${fmtU(c.unidades)} part. × ${c.precio ? fmtP(c.precio.precio) + ' (' + fechaCorta(c.precio.fecha) + ')' : 'sin precio'}` : 'Sin participaciones') : (c.precio ? 'Valor estimado el ' + fechaCorta(c.precio.fecha) : 'Valorado por lo aportado');
-        return `<button type="button" class="prod" data-id="${esc(p.id)}"><span class="nm">${esc(p.nombre)}</span><span class="val">${esc(fmt(c.valor))}</span><span class="meta">${esc((p.isin ? p.isin + ' · ' : '') + meta)}</span><span class="gan ${c.gan<0?'neg':c.gan>0?'pos':''}">${esc(fmtS(c.gan))} · ${esc(fmtPct(c.ganPct, true))}</span><span class="chips">${chips.join('')}</span></button>`;
-      }).join('');
+        if(c.sinPrecio) chips.push(`<span class="chip warn">Sin valor</span>`);
+        if(c.viejo) chips.push(`<span class="chip">Valor antiguo</span>`);
+        const meta = cotiza(p) ? (c.unidades ? `${fmtU(c.unidades)} part. · ${c.precio ? 'valor del ' + fechaCorta(c.precio.fecha) : 'sin valor actualizado'}` : 'Sin participaciones') : (c.precio ? 'Valor estimado el ' + fechaCorta(c.precio.fecha) : 'Valorado por lo aportado');
+        return `<button type="button" class="prod" data-id="${esc(p.id)}"><span class="nm">${esc(p.nombre)}</span><span class="val">${esc(fmt(c.valor))}</span><span class="meta">${esc((p.isin ? p.isin + ' · ' : '') + meta)}</span><span class="gan ${c.gan<0?'neg':c.gan>0?'pos':''}">${p.tipo==='inmueble' && !c.precio ? 'puesto ' + esc(fmt(c.coste)) : esc(fmtS(c.gan)) + ' · ' + esc(fmtPct(c.ganPct, true))}</span><span class="chips">${chips.join('')}</span></button>`;
+      };
+      $('prodList').innerHTML = ['bolsa','inmueble','otro'].map(cl => [cl, lista.filter(p => claseDeProd(p)===cl)]).filter(([,l]) => l.length)
+        .map(([cl, l]) => `<div class="eyebrow" style="margin-top:6px">${CLASES[cl]}</div>` + l.map(tarjeta).join('')).join('');
     }
-    $('precioNota').textContent = 'Actualiza el precio de cada producto cuando quieras, por ejemplo al hacer el cierre de mes. Si un precio tiene más de 40 días, la app te lo marca.';
+    $('precioNota').textContent = 'Actualiza el valor de cada producto en su ficha cuando quieras, por ejemplo al hacer el cierre de mes. Si tiene más de 40 días, la app te lo marca.';
   };
   $('prodList').addEventListener('click', e => { const b = e.target.closest('.prod'); if(!b) return; const p = prodById(b.dataset.id); if(p) abrirProd(p); });
 
@@ -2052,7 +2087,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     if(b.dataset.v === 'aportacion' && !editId){ abrirOp(null, presetDesdeMov()); return; }
     setTipo(b.dataset.v);
   });
-  $('fAOp').addEventListener('click', () => { if(!editId) return; abrirOp(null, Object.assign(presetDesdeMov(), {convertir: editId})); });
+  $('fAOp').addEventListener('click', () => { if(!editId) return; const mv = state.movs.find(x => x.id===editId); const cl = mv && mv.cat==='inv_inmu' ? 'inmueble' : mv && mv.cat==='inv_bolsa' ? 'bolsa' : undefined; abrirOp(null, Object.assign(presetDesdeMov(), {convertir: editId, clase: cl})); });
   $('fCat').addEventListener('change', () => {
     $('fNewWrap').hidden = $('fCat').value !== '__new';
     if($('fCat').value==='__new'){ $('fNew').focus(); return; }
@@ -2485,6 +2520,8 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
       const changes = [], avisos = [];
       d.meses.forEach(ym => {
         const tot = Object.keys(porMesCat).filter(k => k.startsWith(ym + '|')).map(k => ({cid: k.split('|')[1], T: porMesCat[k]}));
+        // conceptos que tenían cierre en ese mes y ya no vienen en el archivo: se quita su cierre (los movimientos sueltos se respetan)
+        state.movs.forEach(m => { if(m.cierre && m.id === idCierre(ym, m.cat) && !tot.some(t => t.cid === m.cat)){ const c = catFn(m.cat); tot.push({cid: m.cat, T: conceptoTotales(ym, c).daily}); } });
         tot.forEach(t => { const c = catFn(t.cid); if(c.tipo==='inversion' && t.T < 0){ avisos.push(nombreMes(ym)); t.T = 0; } });
         const r = cambiosConceptos(ym, tot, catFn); r.changes.forEach(ch => changes.push(ch));
       });
@@ -2726,29 +2763,29 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   const ISIN_RE = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
   function notaTipoProd(){
     const t = $('prTipo').value;
-    $('prTipoNote').textContent = (t==='fondo' || t==='etf') ? 'Se valora con participaciones × precio. Desde la ficha puedes buscar el precio por su ISIN.' : t==='inmueble' ? 'Se valora por lo que has aportado (por ejemplo, los plazos de la entrada del piso) hasta que pongas un valor estimado.' : 'Se valora por lo aportado hasta que pongas un valor estimado.';
-    $('prTickerWrap').hidden = t==='inmueble';
+    $('prTipoNote').textContent = ['fondo','etf','accion'].includes(t) ? 'Cada compra se apunta con el importe y las participaciones. El valor lo actualizas tú con el que te muestre tu bróker.' : t==='inmueble' ? 'Se valora por lo que has aportado (por ejemplo, los plazos de la entrada del piso) hasta que pongas un valor estimado.' : 'Se valora por lo aportado hasta que pongas un valor estimado.';
   }
   $('prTipo').addEventListener('change', notaTipoProd);
   function abrirProd(p, opts){
     prodId = p ? p.id : null; volverOp = opts && opts.volverOp ? opts.volverOp : null;
     $('tProd').textContent = p ? p.nombre : 'Nuevo producto';
-    $('prNombre').value = p ? p.nombre : ''; $('prIsin').value = p ? (p.isin||'') : ''; $('prTipo').value = p ? (p.tipo||'fondo') : 'fondo'; $('prTicker').value = p ? (p.ticker||'') : '';
+    $('prNombre').value = p ? p.nombre : ''; $('prTipo').value = p ? (p.tipo||'fondo') : (opts && opts.tipo) || 'fondo';
     $('prErr').textContent = ''; prodDesarmar();
     $('prDel').hidden = !p; $('prDel').textContent = p && opsDe(p.id).length ? (p.archivado ? 'Desarchivar' : 'Archivar') : 'Eliminar';
     notaTipoProd(); pintarDetalleProd();
     abrir($('sheetProd'), p ? null : $('prNombre'));
   }
-  const linkPrecio = p => p.tipo==='etf' ? 'https://www.justetf.com/es/etf-profile.html?isin=' + encodeURIComponent(p.isin) : 'https://www.google.com/search?q=' + encodeURIComponent(p.isin + ' valor liquidativo');
+  const linkPrecio = p => p.tipo==='accion' ? 'https://www.google.com/search?q=' + encodeURIComponent(p.isin + ' cotización') : p.tipo==='etf' ? 'https://www.justetf.com/es/etf-profile.html?isin=' + encodeURIComponent(p.isin) : 'https://www.google.com/search?q=' + encodeURIComponent(p.isin + ' valor liquidativo');
   function pintarDetalleProd(){
     const el = $('prDetalle'), p = prodId ? prodById(prodId) : null;
     if(!p){ el.innerHTML = `<p class="note">Después de guardarlo podrás registrar compras y precios.</p>`; return; }
     const c = prodCalc(p), rend = rendimientoTxt(c), esC = cotiza(p), hoy = hoyISO();
     const hist = preciosDe(p.id).slice().reverse().slice(0, 8);
-    let html = `<div class="mini ${esC?'':'c2'}">${stat(fmt(c.valor), 'Valor')}${stat(fmt(c.coste), 'Coste')}${stat(fmtS(c.gan), 'Ganancia', c.gan<0?'neg':'pos')}${esC ? stat(fmtU(c.unidades), 'Participaciones') : ''}${esC ? stat(c.precio ? fmtP(c.precio.precio) : '—', 'Último precio') : ''}${stat(rend.v, rend.k, rend.n<0?'neg':'pos')}</div>`;
+    let html = `<div class="mini ${esC?'':'c2'}">${stat(fmt(c.valor), 'Valor')}${stat(fmt(c.coste), 'Coste')}${stat(fmtS(c.gan), 'Ganancia', c.gan<0?'neg':'pos')}${esC ? stat(fmtU(c.unidades), 'Participaciones') : ''}${esC ? stat(c.precio ? fmtP(c.precio.precio) : '—', 'Precio por part.') : ''}${stat(rend.v, rend.k, rend.n<0?'neg':'pos')}</div>`;
+    if(p.tipo==='inmueble'){ const por = {}; opsDe(p.id).forEach(o => { if(o.tipo==='aportacion'){ const k = CONCEPTOS_INM[o.concepto] ? o.concepto : 'entrada'; por[k] = (por[k]||0) + o.importe; } }); const ks = Object.keys(CONCEPTOS_INM).filter(k => por[k]); if(ks.length) html += `<div><div class="eyebrow">Lo que has puesto</div><div class="hist">${ks.map(k => `<div class="h"><span>${esc(CONCEPTOS_INM[k])}</span><span class="num">${esc(fmt(por[k]))}</span><span></span></div>`).join('')}</div></div>`; }
     if(c.revisar){ const l = preciosDe(p.id), last = l[l.length-1], prev = l[l.length-2]; html += `<div class="wipebox" style="border-color:color-mix(in srgb, var(--warn) 45%, var(--line));background:color-mix(in srgb, var(--warn) 8%, var(--surface))"><p><b>¿Es correcto este precio?</b></p><p class="note">Claude trajo ${esc(fmtP(last.precio))} el ${esc(fechaCorta(last.fecha))}, un ${esc(fmtPct(last.precio/prev.precio-1, true))} respecto al anterior (${esc(fmtP(prev.precio))}).</p><div class="actions"><button type="button" class="btn small" data-pract="borrarprecio" data-pid="${esc(last.id)}">No, bórralo</button><button type="button" class="btn small primary" data-pract="confirmar" data-pid="${esc(last.id)}">Sí, es correcto</button></div></div>`; }
-    html += `<div class="pricebox"><div class="two"><div class="field"><label for="prPrecio">${esC ? 'Precio por participación' : 'Valor estimado total'}</label><input id="prPrecio" inputmode="decimal" autocomplete="off" placeholder="${esC ? 'Ej. 41,2731' : 'Ej. 45.000'}"></div><div class="field"><label for="prPFecha">Fecha</label><input id="prPFecha" type="date" value="${hoy}"></div></div><div class="actions"><button type="button" class="btn small" data-pract="guardarprecio">${esC ? 'Guardar precio' : 'Guardar valor'}</button>${esC && p.isin ? `<a class="linkbtn" style="align-self:center" href="${esc(linkPrecio(p))}" target="_blank" rel="noopener noreferrer">Buscar precio</a>` : ''}</div></div>`;
-    if(hist.length) html += `<div><div class="eyebrow">Precios</div><div class="hist">${hist.map(x => `<div class="h"><span><span class="num">${esc(esC ? fmtP(x.precio) : fmt(Math.round(x.precio*100)))}</span><small>${esc(fechaCorta(x.fecha))} · ${esc(x.origen==='claude' ? 'Claude' + (x.fuente ? ' · ' + x.fuente.replace(/^https?:\/\/(www\.)?/,'').split('/')[0] : '') : x.origen==='operacion' ? 'de una operación' : 'a mano')}</small></span><span></span><button type="button" class="x" data-pract="borrarprecio" data-pid="${esc(x.id)}" aria-label="Borrar precio">×</button></div>`).join('')}</div></div>`;
+    html += `<div class="pricebox"><div class="two"><div class="field"><label for="prPrecio">${esC ? 'Valor actual de tu posición' : 'Valor estimado total'}</label><input id="prPrecio" inputmode="decimal" autocomplete="off" placeholder="${esC ? 'Ej. 2.350,40' : 'Ej. 45.000'}"></div><div class="field"><label for="prPFecha">Fecha</label><input id="prPFecha" type="date" value="${hoy}"></div></div>${esC ? '<p class="note">El que te muestra tu bróker para este producto. La app calcula el precio por participación.</p>' : ''}<div class="actions"><button type="button" class="btn small" data-pract="guardarprecio">Guardar valor</button></div></div>`;
+    if(hist.length) html += `<div><div class="eyebrow">Valores</div><div class="hist">${hist.map(x => `<div class="h"><span><span class="num">${esc(esC ? fmt(Math.round(replay(p.id, x.fecha).unidades * x.precio * 100)) + ' · ' + fmtP(x.precio) + '/part.' : fmt(Math.round(x.precio*100)))}</span><small>${esc(fechaCorta(x.fecha))} · ${esc(x.origen==='claude' ? 'Claude' + (x.fuente ? ' · ' + x.fuente.replace(/^https?:\/\/(www\.)?/,'').split('/')[0] : '') : x.origen==='operacion' ? 'de una operación' : 'a mano')}</small></span><span></span><button type="button" class="x" data-pract="borrarprecio" data-pid="${esc(x.id)}" aria-label="Borrar precio">×</button></div>`).join('')}</div></div>`;
     if(esC && c.lots.length) html += `<div><div class="eyebrow">Lotes que te quedan (FIFO)</div><div class="twrap"><table class="t narrow"><thead><tr><th>Compra</th><th>Part.</th><th>Coste/part.</th><th>Coste</th></tr></thead><tbody>${c.lots.map(l => `<tr><td>${esc(fechaCorta(l.fecha))}</td><td>${esc(fmtU(l.u))}</td><td>${esc(fmtP(l.coste/l.u/100))}</td><td>${esc(fmt(Math.round(l.coste)))}</td></tr>`).join('')}</tbody></table></div><p class="note">Si vendes, Hacienda considera que vendes primero las participaciones más antiguas.</p></div>`;
     if(c.realized.length) html += `<div><div class="eyebrow">Ventas</div><div class="twrap"><table class="t narrow"><thead><tr><th>Fecha</th><th>Part.</th><th>Coste FIFO</th><th>Ganancia</th></tr></thead><tbody>${c.realized.map(r => `<tr><td>${esc(fechaCorta(r.fecha))}</td><td>${esc(fmtU(r.unidades))}</td><td>${esc(fmt(r.coste))}</td><td class="${r.gan<0?'neg':'pos'}">${esc(fmtS(r.gan))}</td></tr>`).join('')}</tbody></table></div></div>`;
     const ops = opsDe(p.id).slice().reverse();
@@ -2763,10 +2800,12 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     try{
       await ready;
       if(act==='guardarprecio'){
-        const v = parseDec($('prPrecio').value), f = $('prPFecha').value || hoyISO();
-        if(!v){ $('prErr').textContent = 'Escribe un precio mayor que cero, por ejemplo 41,27.'; return; }
-        await store.put('precios', p.id + '~' + f, {producto: p.id, fecha: f, precio: v, origen:'manual', confirmado:true, creado: Date.now()});
-        $('prErr').textContent = ''; toast('Precio guardado'); setTimeout(pintarDetalleProd, 60);
+        const v = parseImporte($('prPrecio').value), f = $('prPFecha').value || hoyISO();
+        if(!v){ $('prErr').textContent = 'Escribe un valor mayor que cero, por ejemplo 2.350,40.'; return; }
+        let precio = v/100;
+        if(cotiza(p)){ const u = replay(p.id, f).unidades; if(!u){ $('prErr').textContent = 'En esa fecha no tenías participaciones de este producto. Apunta antes la compra.'; return; } precio = v/100/u; }
+        await store.put('precios', p.id + '~' + f, {producto: p.id, fecha: f, precio, origen:'manual', confirmado:true, creado: Date.now()});
+        $('prErr').textContent = ''; $('prPrecio').value = ''; toast('Valor guardado'); setTimeout(pintarDetalleProd, 60);
       } else if(act==='borrarprecio'){
         await store.remove('precios', b.dataset.pid); toast('Precio borrado'); setTimeout(pintarDetalleProd, 60);
       } else if(act==='confirmar'){
@@ -2781,12 +2820,11 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   $('prCancel').addEventListener('click', () => { if(volverOp && state.productos.some(p => !p.archivado)){ const v = volverOp; volverOp = null; abrirOp(v.op, v.preset); } else { volverOp = null; cerrar(); } });
   $('formProd').addEventListener('submit', async e => {
     e.preventDefault();
-    const nombre = $('prNombre').value.trim(), isin = $('prIsin').value.trim().toUpperCase().replace(/\s/g,''), tipo = $('prTipo').value;
+    const nombre = $('prNombre').value.trim(), tipo = $('prTipo').value;
     if(!nombre){ $('prErr').textContent = 'Ponle un nombre al producto.'; $('prNombre').focus(); return; }
-    if(isin && !ISIN_RE.test(isin)){ $('prErr').textContent = 'El ISIN tiene 12 caracteres: 2 letras de país, 9 letras o números y un dígito final. Ej. IE00B03HCZ61.'; return; }
     const prev = prodId ? prodById(prodId) : null;
     const id = prodId || nuevoId('p');
-    const data = {nombre, isin, tipo, ticker: $('prTicker').value.trim(), cotiza: tipo==='fondo' || tipo==='etf', archivado: prev ? !!prev.archivado : false, creado: prev && prev.creado ? prev.creado : Date.now()};
+    const data = {nombre, isin: prev ? (prev.isin||'') : '', tipo, ticker: prev ? (prev.ticker||'') : '', cotiza: ['fondo','etf','accion'].includes(tipo), archivado: prev ? !!prev.archivado : false, creado: prev && prev.creado ? prev.creado : Date.now()};
     try{
       await ready; await store.put('productos', id, data);
       toast(prev ? 'Producto actualizado' : 'Producto creado');
@@ -2819,9 +2857,11 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     oTipo = t;
     $('oTipo').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v===t));
     const conU = t==='compra' || t==='venta';
-    $('oUPWrap').hidden = !conU; $('oComWrap').hidden = !conU; $('oImpWrap').hidden = conU;
+    $('oUnidWrap').hidden = !conU; $('oComWrap').hidden = !conU;
+    $('oImpLbl').textContent = t==='compra' ? 'Importe pagado' : (t==='venta' || t==='dividendo') ? 'Importe cobrado' : 'Importe';
     const entra = t==='venta' || t==='dividendo';
     $('oCuentaLbl').textContent = entra ? 'Entra en' : 'Sale de';
+    $('oConceptoWrap').hidden = !(oClase==='inmueble' && t==='aportacion');
     llenarOCuenta($('oCuenta').value);
     actualizarOp();
   }
@@ -2833,61 +2873,65 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     if(![...$('oCuenta').options].some(o => o.value===quiero)) quiero = '';
     $('oCuenta').value = quiero;
   }
+  let oClase = 'bolsa';
   function llenarOProd(sel){
-    const lista = state.productos.filter(p => !p.archivado || p.id===sel);
-    $('oProd').innerHTML = lista.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('') + `<option value="__new">＋ Crear producto nuevo…</option>`;
+    const lista = state.productos.filter(p => (!p.archivado || p.id===sel) && claseDeProd(p)===oClase);
+    const nuevo = oClase==='inmueble' ? 'inmueble' : 'producto';
+    $('oProd').innerHTML = lista.map(p => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('') + `<option value="__new">＋ Crear ${nuevo} nuevo…</option>`;
     $('oProd').value = sel && lista.some(p => p.id===sel) ? sel : (lista[0] ? lista[0].id : '__new');
+    $('oProdLbl').textContent = oClase==='inmueble' ? 'Inmueble' : 'Producto';
+    $('oNuevoProd').hidden = lista.length > 0; $('oNuevoProd').textContent = 'Crear ' + nuevo;
   }
+  function setOClase(c, sel){
+    oClase = CLASES[c] ? c : 'bolsa';
+    $('oClase').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v===oClase));
+    llenarOProd(sel);
+    const tipos = TIPOS_CLASE[oClase];
+    $('oTipo').querySelectorAll('button').forEach(b => { b.hidden = !tipos.includes(b.dataset.v); });
+    $('oTipo').style.gridTemplateColumns = 'repeat(' + tipos.length + ', minmax(0,1fr))';
+    $('oTipo').hidden = tipos.length < 2;
+    setOTipo(tipos.includes(oTipo) ? oTipo : tipos[0]);
+    prefillPrecio();
+  }
+  function crearProdDesdeOp(){ abrirProd(null, {tipo: tipoProdDeClase(oClase), volverOp: {op: opId ? state.ops.find(x => x.id===opId) : null, preset: Object.assign({}, opPreset, {tipo: oTipo, clase: oClase})}}); }
+  $('oClase').addEventListener('click', e => { const b = e.target.closest('button'); if(b && b.dataset.v !== oClase) setOClase(b.dataset.v, null); });
+  $('oNuevoProd').addEventListener('click', crearProdDesdeOp);
   function leerOp(){
-    const p = prodById($('oProd').value), u = parseDec($('oUnid').value), pr = parseDec($('oPrecio').value);
-    const comRaw = $('oCom').value.trim(), com = comRaw ? parseImporte(comRaw, true) : 0, imp = parseImporte($('oImp').value);
-    let importe = null;
-    if(oTipo==='compra' && u && pr && com !== null) importe = Math.round(u*pr*100) + com;
-    else if(oTipo==='venta' && u && pr && com !== null) importe = Math.round(u*pr*100) - com;
-    else if(oTipo!=='compra' && oTipo!=='venta') importe = imp;
-    return {p, u, pr, com, importe};
+    const p = prodById($('oProd').value), u = parseDec($('oUnid').value);
+    const comRaw = $('oCom').value.trim(), com = comRaw ? parseImporte(comRaw, true) : 0, importe = parseImporte($('oImp').value);
+    let pr = null;
+    if(u && importe && com !== null){ pr = oTipo==='compra' ? (importe - com)/100/u : oTipo==='venta' ? (importe + com)/100/u : null; }
+    return {p, u, pr: pr && pr > 0 ? pr : null, com, importe};
   }
   function actualizarOp(){
     const r = leerOp(), cu = $('oCuenta').value;
-    $('oTotal').textContent = (oTipo==='compra' || oTipo==='venta') ? (r.importe != null ? (oTipo==='compra' ? 'Total pagado: ' : 'Total cobrado: ') + fmt(r.importe) + (r.com ? ' (comisión incluida)' : '') : 'El total se calcula con participaciones × precio ± comisión.') : '';
+    $('oTotal').textContent = (oTipo==='compra' || oTipo==='venta') ? (r.pr ? 'Precio por participación: ' + fmtP(r.pr) + (r.com ? ', sin contar la comisión.' : '.') : 'Escribe el importe y las participaciones que vienen en el justificante de tu bróker.') : '';
     $('oTotal').hidden = !(oTipo==='compra' || oTipo==='venta');
-    if(!opId && opPreset && opPreset.importe && (oTipo==='compra' || oTipo==='venta')){
-      $('oTotal').textContent += ' Importe que apuntaste: ' + fmt(opPreset.importe) + '.';
-      if(r.pr && !$('oUnid').value){ const cm = r.com || 0; $('oUnid').placeholder = '≈ ' + toDecInput(Math.max(0, (opPreset.importe - cm)/100/r.pr)); } else $('oUnid').placeholder = 'Ej. 12,3456';
-    }
     const entra = oTipo==='venta' || oTipo==='dividendo';
     $('oCuentaNote').textContent = cu ? (entra ? `Suma al saldo de ${cuentaById(cu).nombre}${oTipo==='venta' ? ' y cuenta como desinversión del mes' : ' y cuenta como ingreso del mes'}.` : `Resta del saldo de ${cuentaById(cu).nombre} y cuenta como inversión del mes. Si ya lo apuntaste en Control de gastos como Inversión, elige Ninguna.`) : (entra ? 'No cambia el saldo de tus cuentas.' : 'No cambia el saldo de tus cuentas ni la inversión del mes: úsalo para lo que ya tenías antes de empezar.');
   }
   $('oTipo').addEventListener('click', e => { const b = e.target.closest('button'); if(b && b.dataset.v !== oTipo) setOTipo(b.dataset.v); });
-  $('oProd').addEventListener('change', () => {
-    if($('oProd').value==='__new'){ abrirProd(null, {volverOp: {op: opId ? state.ops.find(x => x.id===opId) : null, preset: Object.assign({}, opPreset, {tipo: oTipo})}}); return; }
-    const p = prodById($('oProd').value);
-    if(p && !cotiza(p) && (oTipo==='compra' || oTipo==='venta')) setOTipo('aportacion');
-    else if(p && cotiza(p) && oTipo==='aportacion') setOTipo('compra');
-    prefillPrecio();
-  });
-  function prefillPrecio(){ const p = prodById($('oProd').value); if(p && cotiza(p) && !$('oPrecio').value){ const pr = precioEn(p.id, $('oFecha').value || hoyISO()); if(pr) $('oPrecio').placeholder = 'Último: ' + toDecInput(pr.precio); } }
+  $('oProd').addEventListener('change', () => { if($('oProd').value==='__new'){ crearProdDesdeOp(); return; } prefillPrecio(); });
+  function prefillPrecio(){}
   $('formOp').addEventListener('input', actualizarOp);
   $('oCuenta').addEventListener('change', actualizarOp);
   let opPreset = null;
   function abrirOp(o, preset){
     opPreset = o ? null : (preset || null);
-    if(!o && !state.productos.some(p => !p.archivado) && !(preset && preset.producto)){ abrirProd(null, {volverOp: {op:null, preset: preset || {}}}); toast('Primero crea el producto'); return; }
     opId = o ? o.id : null;
-    $('tOp').textContent = o ? 'Editar operación' : 'Nueva operación';
-    llenarOProd(o ? o.producto : preset && preset.producto ? preset.producto : (ls.get('libreta-ult-prod') || null));
-    const p = prodById($('oProd').value);
+    $('tOp').textContent = o ? 'Editar operación' : 'Nueva inversión';
+    const pSel = o ? o.producto : preset && preset.producto ? preset.producto : null;
+    const clase = o ? claseDeProd(prodById(o.producto)) : pSel ? claseDeProd(prodById(pSel)) : (preset && preset.clase) || ls.get('libreta-ult-clase') || 'bolsa';
     $('oUnid').value = o && o.unidades ? toDecInput(o.unidades) : '';
-    $('oPrecio').value = o && o.precio ? toDecInput(o.precio) : ''; $('oPrecio').placeholder = 'Ej. 41,27';
     $('oCom').value = o && o.comision ? toInput(o.comision) : '';
-    $('oImp').value = o && !o.unidades ? toInput(o.importe) : (preset && preset.importe ? toInput(preset.importe) : '');
+    $('oImp').value = o ? toInput(o.importe) : (preset && preset.importe ? toInput(preset.importe) : '');
     $('oFecha').value = o ? o.fecha : (preset && preset.fecha) || hoyISO();
     $('oNota').value = o ? (o.nota||'') : (preset && preset.nota) || '';
+    $('oConcepto').value = (o && o.concepto) || (preset && preset.concepto) || 'entrada';
     $('oErr').textContent = ''; opDesarmar(); $('oDel').hidden = !o;
-    const t = o ? o.tipo : preset && preset.tipo ? preset.tipo : (p && !cotiza(p) ? 'aportacion' : 'compra');
-    oTipo = t; llenarOCuenta(o ? (o.cuenta || '') : (preset && preset.cuenta != null ? preset.cuenta : null));
-    setOTipo(t === 'retirada' ? 'venta' : t);
-    prefillPrecio();
+    oTipo = o ? (o.tipo === 'retirada' ? 'aportacion' : o.tipo) : (preset && preset.tipo) || 'compra';
+    llenarOCuenta(o ? (o.cuenta || '') : (preset && preset.cuenta != null ? preset.cuenta : null));
+    setOClase(clase, pSel || ls.get('libreta-ult-prod'));
     abrir($('sheetOp'), null);
   }
   function opDesarmar(){ clearTimeout(opDelArmed); opDelArmed = null; $('oDel').classList.remove('armed'); $('oDel').textContent = 'Eliminar'; }
@@ -2895,19 +2939,21 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   $('formOp').addEventListener('submit', async e => {
     e.preventDefault();
     const r = leerOp(), fecha = $('oFecha').value || hoyISO();
-    if(!r.p){ $('oErr').textContent = 'Elige un producto o crea uno nuevo.'; return; }
+    if(!r.p){ $('oErr').textContent = oClase==='inmueble' ? 'Elige el inmueble o crea uno nuevo.' : 'Elige un producto o crea uno nuevo.'; return; }
     if(oTipo==='compra' || oTipo==='venta'){
+      if(!r.importe){ $('oErr').textContent = 'Escribe el importe, por ejemplo 500.'; $('oImp').focus(); return; }
       if(!r.u){ $('oErr').textContent = 'Escribe las participaciones, por ejemplo 12,3456.'; $('oUnid').focus(); return; }
-      if(!r.pr){ $('oErr').textContent = 'Escribe el precio por participación, por ejemplo 41,27.'; $('oPrecio').focus(); return; }
       if(r.com === null){ $('oErr').textContent = 'La comisión debe ser un número, por ejemplo 1,50.'; return; }
+      if(!r.pr){ $('oErr').textContent = 'La comisión no puede ser igual o mayor que el importe.'; return; }
       if(!cotiza(r.p)){ $('oErr').textContent = 'Este producto no cotiza: usa Aportación.'; return; }
       if(oTipo==='venta'){ const disp = replay(r.p.id, fecha, opId).unidades; if(r.u > disp + 1e-6){ $('oErr').textContent = `En esa fecha solo tenías ${fmtU(disp)} participaciones.`; return; } }
-      if(r.importe == null || r.importe <= 0){ $('oErr').textContent = 'El total sale cero o negativo. Revisa la comisión.'; return; }
-    } else if(oTipo==='aportacion' && cotiza(r.p)){ $('oErr').textContent = 'En fondos y ETF usa Compra, con participaciones y precio: así se calcula su valor y el FIFO.'; return; }
+    } else if(oTipo==='aportacion' && cotiza(r.p)){ $('oErr').textContent = 'En fondos, ETF y acciones usa Compra, con importe y participaciones: así funciona el FIFO.'; return; }
     else if(!r.importe){ $('oErr').textContent = 'Escribe el importe, por ejemplo 500.'; $('oImp').focus(); return; }
     const prev = opId ? state.ops.find(x => x.id===opId) : null;
     const data = {producto: r.p.id, tipo: oTipo, fecha, importe: r.importe, cuenta: $('oCuenta').value || '', nota: $('oNota').value.trim().slice(0,80), creado: prev && prev.creado ? prev.creado : Date.now()};
     if(oTipo==='compra' || oTipo==='venta'){ data.unidades = r.u; data.precio = r.pr; data.comision = r.com || 0; }
+    if(oClase==='inmueble' && oTipo==='aportacion') data.concepto = $('oConcepto').value;
+    ls.set('libreta-ult-clase', oClase);
     $('oSave').disabled = true;
     try{
       await ready; await store.put('operaciones', opId || nuevoId('o'), data);
