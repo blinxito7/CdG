@@ -331,6 +331,14 @@ button{cursor:pointer}
 @media (prefers-reduced-motion: reduce){ .scrim,.sheet,.meter .fill,.pie path{transition:none} }
 .aviso{flex-direction:row;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-color:color-mix(in srgb, var(--warn) 50%, var(--line));background:color-mix(in srgb, var(--warn) 7%, var(--surface))}
 .aviso .note{min-width:0}
+.lock{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:auto;
+  padding:max(24px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px))}
+.lockbox{width:100%;max-width:380px;display:flex;flex-direction:column;gap:16px}
+.lockbox h2{font-family:var(--f-display);font-weight:800;font-size:24px;margin:0;text-wrap:balance}
+.lockbox .linkbtn{align-self:center}
+.panel > .btn, .lockbox .btn{flex:none}
+.lockico{width:60px;height:60px;border-radius:15px}
+body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cubierto .app, body.cubierto .bar-bottom, body.cubierto .scrim{visibility:hidden}
 </style>
 </head>
 <body>
@@ -595,6 +603,10 @@ button{cursor:pointer}
     <div class="addcat"><input id="aNewInversion" maxlength="40" placeholder="Nuevo concepto de inversión" aria-label="Nuevo concepto de inversión"><button type="button" data-add="inversion">Añadir</button></div>
     <p class="note">Si quitas un concepto o una cuenta, deja de salir en los desplegables; lo ya apuntado lo conserva.</p>
 
+    <h4>Protección</h4>
+    <p class="note" id="aProt"></p>
+    <div class="actions" id="aProtRow"></div>
+
     <h4>Importar tu histórico</h4>
     <p class="note">Exporta tu Numbers a Excel o CSV: una fila por concepto y una columna por mes, como en tu plantilla. Cada mes importado se guarda como su cierre; si importas el mismo mes otra vez, se sustituye.</p>
     <div class="actions">
@@ -618,6 +630,7 @@ button{cursor:pointer}
       <input type="file" id="aRestore" accept=".json,application/json" hidden>
     </div>
     <p class="note" id="aRestoreMsg" hidden></p>
+    <div class="field" id="aRestorePassWrap" hidden><label for="aRestorePass">Contraseña de la copia</label><div class="addcat"><input type="password" id="aRestorePass" autocomplete="current-password" aria-label="Contraseña de la copia"><button type="button" id="aRestoreOpen">Abrir copia</button></div></div>
     <div class="actions" id="aRestoreRow" hidden>
       <button type="button" class="btn" id="aRestoreNo">Cancelar</button>
       <button type="button" class="btn primary" id="aRestoreYes">Añadir a mi libreta</button>
@@ -717,6 +730,28 @@ button{cursor:pointer}
     </div>
   </form>
 </div>
+
+<!-- hoja: copia de seguridad -->
+<div class="scrim" id="sheetCopia" hidden>
+  <form class="sheet" id="formCopia" role="dialog" aria-modal="true" aria-labelledby="tCopia" novalidate>
+    <div class="grip"></div>
+    <h3 id="tCopia">Copia de seguridad</h3>
+    <p class="note">Protege la copia con una contraseña. Sin ella nadie puede abrirla, tampoco tú: si la olvidas, la copia no sirve. La app no guarda la contraseña en ningún sitio.</p>
+    <div id="kPaso1" class="panel" style="gap:12px">
+      <div id="kApp" class="panel" style="gap:10px" hidden><button type="button" class="btn primary" id="kUsarApp">Cifrar con la contraseña de la app</button><p class="note">Se abrirá con la contraseña que tenga la app hoy. O protégela con otra:</p></div>
+      <div class="field"><label for="kPass">Contraseña (mínimo 8 caracteres)</label><input type="password" id="kPass" autocomplete="new-password"></div>
+      <div class="field"><label for="kPass2">Repite la contraseña</label><input type="password" id="kPass2" autocomplete="new-password"></div>
+      <p class="err" id="kErr" role="alert"></p>
+      <div class="actions"><button type="button" class="btn" id="kSin">Sin contraseña</button><button type="submit" class="btn primary" id="kCifrar">Cifrar copia</button></div>
+    </div>
+    <div id="kPaso2" class="panel" style="gap:12px" hidden>
+      <p class="note" id="kListo"></p>
+      <div class="actions"><button type="button" class="btn" id="kCancel">Cancelar</button><button type="button" class="btn primary" id="kGuardar">Guardar en Archivos</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="lock" id="lock" hidden><div class="lockbox"><img src="icon.png" class="lockico" alt=""><div id="lockBody" class="panel" style="gap:14px"></div></div></div>
 
 <div class="toast" id="toast" hidden></div>
 
@@ -893,22 +928,27 @@ button{cursor:pointer}
   function aplicarSnapshot(col, lista){
     if(col==='gastos') state.movs = lista; else if(col==='productos') state.productos = lista; else if(col==='operaciones') state.ops = lista; else state.precios = lista;
   }
-  function localStore(){
-    const KEY = 'libreta-gastos-v1';
-    let mem = {gastos:[], prefs:null, productos:[], operaciones:[], precios:[]};
-    try{ const raw = ls.get(KEY); if(raw) mem = Object.assign(mem, JSON.parse(raw)); }catch(e){}
-    let ok = true; try{ localStorage.setItem('__prueba', '1'); localStorage.removeItem('__prueba'); }catch(e){ ok = false; }
-    const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(mem)); }catch(e){ throw {code:'quota_exceeded'}; } };
+  const KEY = 'libreta-gastos-v1', KEYC = 'libreta-cifrada-v1';
+  const memVacia = () => ({gastos:[], prefs:null, productos:[], operaciones:[], precios:[]});
+  let almacenOk = true; try{ localStorage.setItem('__prueba', '1'); localStorage.removeItem('__prueba'); }catch(e){ almacenOk = false; }
+  function leerPlano(){ let mem = memVacia(); try{ const raw = localStorage.getItem(KEY); if(raw) mem = Object.assign(mem, JSON.parse(raw)); }catch(e){} return mem; }
+  function escribir(k, v){ try{ localStorage.setItem(k, v); }catch(e){ throw {code:'quota_exceeded'}; } }
+  const guardarPlano = mem => escribir(KEY, JSON.stringify(mem));
+  function localStore(memInicial, guardarInicial){
+    let mem = memInicial || memVacia(), guardar = guardarInicial || guardarPlano, cola = Promise.resolve();
+    const save = () => (cola = cola.catch(() => {}).then(() => guardar(mem)));
     const sync = () => { COLS.forEach(c => aplicarSnapshot(c, (mem[c]||[]).slice())); state.prefs = normalizePrefs(mem.prefs); fmtCache = {}; scheduleRender(); };
     const put1 = (col,id,m) => { mem[col] = (mem[col]||[]).filter(x => x.id!==id).concat([Object.assign({}, m, {id})]); };
     const del1 = (col,id) => { mem[col] = (mem[col]||[]).filter(x => x.id!==id); };
     return {
-      modo:'local', ok, start: sync,
-      async put(col,id,m){ put1(col,id,m); save(); sync(); },
-      async remove(col,id){ del1(col,id); save(); sync(); },
-      async apply(col, changes, progreso){ changes.forEach(ch => ch.data ? put1(col, ch.id, ch.data) : del1(col, ch.id)); save(); sync(); if(progreso) progreso(changes.length, changes.length); },
-      async clearAll(){ mem = {gastos:[], prefs:null, productos:[], operaciones:[], precios:[]}; save(); sync(); },
-      async setPrefs(p){ mem.prefs = p; save(); sync(); }
+      modo:'local', ok: almacenOk, start: sync,
+      async put(col,id,m){ put1(col,id,m); sync(); await save(); },
+      async remove(col,id){ del1(col,id); sync(); await save(); },
+      async apply(col, changes, progreso){ changes.forEach(ch => ch.data ? put1(col, ch.id, ch.data) : del1(col, ch.id)); sync(); await save(); if(progreso) progreso(changes.length, changes.length); },
+      async clearAll(){ mem = memVacia(); sync(); await save(); },
+      async setPrefs(p){ mem.prefs = p; sync(); await save(); },
+      cambiarGuardado(fn){ guardar = fn; return save(); },
+      esperar(){ return cola.catch(() => {}); }
     };
   }
   function dbStore(db, uid){
@@ -952,12 +992,191 @@ button{cursor:pointer}
     if(c==='resource_exhausted') return 'Demasiados cambios seguidos. Espera unos segundos y vuelve a intentarlo.';
     return 'No se pudo guardar. Revisa tu conexión y vuelve a intentarlo.';
   }
-  function init(){
-    store = localStore();
-    state.modo = store.modo;
+  function arrancar(mem, guardar){
+    store = localStore(mem, guardar); state.modo = 'local';
     store.start(); scheduleRender(); initDownloads();
+  }
+  function init(){
+    let rc = null; try{ rc = localStorage.getItem(KEYC); }catch(e){}
+    if(rc){ try{ registro = JSON.parse(rc); }catch(e){ registro = null; } }
+    if(registro) mostrarBloqueo('abrir');
+    else {
+      arrancar(leerPlano(), guardarPlano);
+      let ahoraNo = false; try{ ahoraNo = !!sessionStorage.getItem('libreta-ahora-no'); }catch(e){}
+      if(!ahoraNo && puedeCifrar()) mostrarBloqueo('crear');
+    }
     try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); }catch(e){}
   }
+
+  /* ---------- protección: datos cifrados con contraseña y Face ID ---------- */
+  // Una llave aleatoria cifra los datos; la contraseña (PBKDF2) y Face ID (llave de acceso con PRF) solo guardan esa llave envuelta.
+  let registro = null, llaveK = null, llaveRaw = null, bloqueoModo = null, fidPendiente = null;
+  const protegido = () => !!registro;
+  const importarLlave = raw => crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt','decrypt']);
+  async function envolver(kek, raw){ const iv = crypto.getRandomValues(new Uint8Array(12)); const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, kek, raw); return {iv: b64(iv), ct: b64(ct)}; }
+  async function desenvolver(kek, w){ return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv: unb64(w.iv)}, kek, unb64(w.ct))); }
+  async function guardarCifrado(mem){
+    if(!llaveK || !registro) throw {code:'bloqueada'};
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, llaveK, new TextEncoder().encode(JSON.stringify(mem)));
+    registro.iv = b64(iv); registro.ct = b64(ct);
+    escribir(KEYC, JSON.stringify(registro));
+  }
+  async function abrirRegistro(raw){
+    const k = await importarLlave(raw);
+    const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv: unb64(registro.iv)}, k, unb64(registro.ct));
+    llaveRaw = raw; llaveK = k;
+    return Object.assign(memVacia(), JSON.parse(new TextDecoder().decode(pt)));
+  }
+  async function envolverPass(pass){ const salt = crypto.getRandomValues(new Uint8Array(16)); const kek = await claveDe(pass, salt, ITER); return Object.assign({salt: b64(salt), iter: ITER}, await envolver(kek, llaveRaw)); }
+  async function kekPrf(prf){
+    const base = await crypto.subtle.importKey('raw', prf, 'HKDF', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({name:'HKDF', hash:'SHA-256', salt: new TextEncoder().encode('libreta'), info: new TextEncoder().encode('faceid-v1')}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+  }
+  async function prfFaceId(credB64, saltB64){
+    const cred = await navigator.credentials.get({publicKey: {challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: location.hostname, allowCredentials: [{type:'public-key', id: unb64(credB64)}], userVerification:'required', timeout: 60000, extensions: {prf: {eval: {first: unb64(saltB64)}}}}});
+    const r = cred && cred.getClientExtensionResults ? cred.getClientExtensionResults().prf : null;
+    if(!r || !r.results || !r.results.first) throw new Error('sin-prf');
+    return r.results.first;
+  }
+  const faceIdPosible = () => !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create && puedeCifrar());
+  async function guardarFaceId(credB64, saltB64, prf){
+    registro.wraps.faceid = Object.assign({cred: credB64, salt: saltB64}, await envolver(await kekPrf(prf), llaveRaw));
+    escribir(KEYC, JSON.stringify(registro));
+  }
+  async function activarFaceId(){
+    const salt = crypto.getRandomValues(new Uint8Array(32));
+    const cred = await navigator.credentials.create({publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)), rp: {name:'Libreta', id: location.hostname},
+      user: {id: crypto.getRandomValues(new Uint8Array(16)), name:'Libreta', displayName:'Libreta'},
+      pubKeyCredParams: [{type:'public-key', alg:-7}, {type:'public-key', alg:-257}],
+      authenticatorSelection: {authenticatorAttachment:'platform', residentKey:'required', userVerification:'required'},
+      timeout: 60000, extensions: {prf: {eval: {first: salt}}}}});
+    const ext = cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
+    if(!ext.prf || ext.prf.enabled === false) throw new Error('sin-prf');
+    const credB64 = b64(cred.rawId);
+    if(ext.prf.results && ext.prf.results.first){ await guardarFaceId(credB64, b64(salt), ext.prf.results.first); return true; }
+    fidPendiente = {cred: credB64, salt: b64(salt)};
+    return false;
+  }
+  function lkOcupado(b){ $('lockBody').querySelectorAll('button,input').forEach(x => { x.disabled = b; }); }
+  function mostrarBloqueo(modo, aviso){
+    bloqueoModo = modo; document.body.classList.add('bloqueada'); $('lock').hidden = false;
+    const fid = registro && registro.wraps && registro.wraps.faceid;
+    let h = '';
+    if(modo==='abrir'){
+      h = `<h2>Libreta bloqueada</h2><p class="note">${esc(aviso || 'Tus datos están cifrados en este dispositivo.')}</p>
+        ${fid ? '<button type="button" class="btn primary" data-lk="faceid">Desbloquear con Face ID</button>' : ''}
+        <form id="lkForm" class="panel" style="gap:10px" novalidate><div class="field"><label for="lkPass">Contraseña</label><input type="password" id="lkPass" autocomplete="current-password"></div><button type="submit" class="btn ${fid?'':'primary'}">Desbloquear con contraseña</button></form>
+        <p class="err" id="lkErr" role="alert"></p>
+        <button type="button" class="linkbtn" data-lk="olvido">¿Has olvidado la contraseña?</button>`;
+    } else if(modo==='crear' || modo==='cambiar'){
+      h = `<h2>${modo==='crear' ? 'Protege tu libreta' : 'Nueva contraseña'}</h2><p class="note">${modo==='crear' ? 'Tus datos se guardarán cifrados y la app se bloqueará al minuto de salir de ella. Sin la contraseña (o Face ID) nadie puede abrirlos, tampoco tú: si la olvidas, solo podrás recuperar lo que tengas en una copia.' : 'Las copias que hiciste con la contraseña de la app seguirán abriéndose con la contraseña antigua.'}</p>
+        <form id="lkForm" class="panel" style="gap:10px" novalidate><div class="field"><label for="lkPass">Contraseña (mínimo 8 caracteres)</label><input type="password" id="lkPass" autocomplete="new-password"></div><div class="field"><label for="lkPass2">Repite la contraseña</label><input type="password" id="lkPass2" autocomplete="new-password"></div><button type="submit" class="btn primary">${modo==='crear' ? 'Proteger la libreta' : 'Cambiar contraseña'}</button></form>
+        <p class="err" id="lkErr" role="alert"></p>
+        <button type="button" class="linkbtn" data-lk="${modo==='crear' ? 'ahorano' : 'listo'}">${modo==='crear' ? 'Ahora no' : 'Cancelar'}</button>`;
+    } else if(modo==='faceid'){
+      h = `<h2>¿Abrir con Face ID?</h2><p class="note">Face ID será un atajo: la contraseña seguirá sirviendo siempre. El iPhone creará una llave de acceso llamada "Libreta" en la app Contraseñas.</p><button type="button" class="btn primary" data-lk="activar">Activar Face ID</button><p class="err" id="lkErr" role="alert"></p><button type="button" class="linkbtn" data-lk="listo">Ahora no</button>`;
+    } else if(modo==='faceid2'){
+      h = `<h2>Un paso más</h2><p class="note">Confirma con Face ID para terminar de activarlo.</p><button type="button" class="btn primary" data-lk="confirmar">Confirmar con Face ID</button><p class="err" id="lkErr" role="alert"></p><button type="button" class="linkbtn" data-lk="listo">Ahora no</button>`;
+    } else if(modo==='olvido'){
+      h = `<h2>Sin contraseña no se puede abrir</h2><p class="note">Tus datos están cifrados y nadie puede descifrarlos sin la contraseña o Face ID. Si tienes una copia, puedes borrar la libreta de este dispositivo y restaurarla después en Ajustes → Restaurar una copia.</p><button type="button" class="btn danger" data-lk="borrar">Borrar la libreta de este dispositivo</button><button type="button" class="linkbtn" data-lk="volver">Volver</button>`;
+    }
+    $('lockBody').innerHTML = h;
+    const pi = $('lkPass'); if(pi && !(modo==='abrir' && fid)) setTimeout(() => pi.focus(), 60);
+  }
+  function ocultarBloqueo(){ $('lock').hidden = true; document.body.classList.remove('bloqueada'); bloqueoModo = null; }
+  async function bloquear(){
+    if(!protegido()) return;
+    document.body.classList.add('bloqueada'); $('lock').hidden = false;
+    try{ if(store) await store.esperar(); }catch(e){}
+    llaveK = null; llaveRaw = null; cerrar();
+    COLS.forEach(c => aplicarSnapshot(c, [])); state.prefs = normalizePrefs(null); state.filtroCuenta = null;
+    store = null; render(); mostrarBloqueo('abrir');
+  }
+  $('lock').addEventListener('submit', async e => {
+    e.preventDefault();
+    const err = $('lkErr'), p1 = $('lkPass').value;
+    if(bloqueoModo==='abrir'){
+      if(!p1){ $('lkPass').focus(); return; }
+      lkOcupado(true);
+      try{ const w = registro.wraps.pass; const raw = await desenvolver(await claveDe(p1, unb64(w.salt), w.iter), w); const mem = await abrirRegistro(raw); arrancar(mem, guardarCifrado); ocultarBloqueo(); }
+      catch(x){ err.textContent = 'Contraseña incorrecta.'; $('lkPass').value = ''; }
+      finally{ lkOcupado(false); }
+      return;
+    }
+    const p2 = $('lkPass2').value;
+    if(p1.length < 8){ err.textContent = 'Usa una contraseña de al menos 8 caracteres.'; return; }
+    if(p1 !== p2){ err.textContent = 'Las dos contraseñas no coinciden.'; return; }
+    if(!puedeCifrar()){ err.textContent = 'Este navegador no permite cifrar aquí. Abre la app desde su dirección https.'; return; }
+    lkOcupado(true);
+    const modo = bloqueoModo;
+    try{
+      if(modo==='crear'){
+        if(store) await store.esperar(); else arrancar(memVacia(), guardarPlano);
+        llaveRaw = crypto.getRandomValues(new Uint8Array(32)); llaveK = await importarLlave(llaveRaw);
+        registro = {v:1, iv:'', ct:'', wraps:{pass: await envolverPass(p1)}};
+        await store.cambiarGuardado(guardarCifrado);
+        try{ localStorage.removeItem(KEY); }catch(x){}
+        toast('Libreta protegida');
+        if(faceIdPosible()) mostrarBloqueo('faceid'); else { ocultarBloqueo(); render(); }
+      } else {
+        registro.wraps.pass = await envolverPass(p1); escribir(KEYC, JSON.stringify(registro));
+        ocultarBloqueo(); toast('Contraseña cambiada'); render();
+      }
+    }catch(x){
+      err.textContent = 'No se pudo guardar: ' + (x && x.code==='quota_exceeded' ? 'no queda espacio en el dispositivo.' : 'vuelve a intentarlo.');
+      if(modo==='crear'){ registro = null; llaveK = null; llaveRaw = null; try{ localStorage.removeItem(KEYC); }catch(y){} if(store) store.cambiarGuardado(guardarPlano).catch(() => {}); }
+    }
+    finally{ lkOcupado(false); }
+  });
+  $('lock').addEventListener('click', async e => {
+    const b = e.target.closest('[data-lk]'); if(!b) return;
+    const a = b.dataset.lk, err = $('lkErr');
+    const fallo = x => x && x.name==='NotAllowedError' ? 'Cancelado. Prueba otra vez o usa la contraseña.' : 'Face ID no ha funcionado. Usa la contraseña.';
+    if(a==='faceid'){
+      lkOcupado(true);
+      try{ const f = registro.wraps.faceid; const prf = await prfFaceId(f.cred, f.salt); const raw = await desenvolver(await kekPrf(prf), f); const mem = await abrirRegistro(raw); arrancar(mem, guardarCifrado); ocultarBloqueo(); }
+      catch(x){ if(err) err.textContent = fallo(x); }
+      finally{ lkOcupado(false); }
+    } else if(a==='activar' || a==='confirmar'){
+      lkOcupado(true);
+      try{
+        if(a==='activar'){ const hecho = await activarFaceId(); if(!hecho){ mostrarBloqueo('faceid2'); return; } }
+        else { const prf = await prfFaceId(fidPendiente.cred, fidPendiente.salt); await guardarFaceId(fidPendiente.cred, fidPendiente.salt, prf); fidPendiente = null; }
+        toast('Face ID activado'); ocultarBloqueo(); render();
+      }catch(x){
+        if(err) err.textContent = x && x.message==='sin-prf' ? 'Tu iPhone no permite abrir datos cifrados con Face ID desde esta app. Sigue con la contraseña; puedes borrar la llave "Libreta" en la app Contraseñas.' : x && x.name==='NotAllowedError' ? 'Cancelado. Puedes activarlo más tarde en Ajustes.' : 'No se pudo activar Face ID. Puedes intentarlo más tarde en Ajustes.';
+      }
+      finally{ lkOcupado(false); }
+    } else if(a==='listo'){ fidPendiente = null; ocultarBloqueo(); render(); }
+    else if(a==='ahorano'){ try{ sessionStorage.setItem('libreta-ahora-no', '1'); }catch(x){} ocultarBloqueo(); }
+    else if(a==='olvido') mostrarBloqueo('olvido');
+    else if(a==='volver') mostrarBloqueo('abrir');
+    else if(a==='borrar'){
+      if(!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'Toca otra vez: se borra todo de este dispositivo'; return; }
+      try{ localStorage.removeItem(KEYC); localStorage.removeItem(KEY); }catch(x){}
+      registro = null; llaveK = null; llaveRaw = null; arrancar(memVacia(), guardarPlano); mostrarBloqueo('crear');
+    }
+  });
+  let ocultoDesde = 0;
+  document.addEventListener('visibilitychange', () => {
+    if(!protegido() || !llaveK) return;
+    if(document.hidden){ ocultoDesde = Date.now(); document.body.classList.add('cubierto'); }
+    else { if(Date.now() - ocultoDesde > 60000) bloquear(); document.body.classList.remove('cubierto'); }
+  });
+  function pintarProteccion(){
+    const fid = registro && registro.wraps && registro.wraps.faceid;
+    $('aProt').textContent = !protegido() ? 'Tu libreta no está protegida: cualquiera que abra la app en tu móvil puede verla.' : 'Datos cifrados en este dispositivo. La app se bloquea al minuto de salir de ella.' + (fid ? ' Face ID activado.' : '');
+    $('aProtRow').innerHTML = !protegido() ? '<button type="button" class="btn primary" data-prot="crear">Proteger con contraseña</button>'
+      : `<button type="button" class="btn" data-prot="cambiar">Cambiar contraseña</button>${faceIdPosible() ? `<button type="button" class="btn" data-prot="${fid ? 'quitarfid' : 'faceid'}">${fid ? 'Quitar Face ID' : 'Activar Face ID'}</button>` : ''}<button type="button" class="btn" data-prot="bloquear">Bloquear ahora</button>`;
+  }
+  $('aProtRow').addEventListener('click', e => {
+    const b = e.target.closest('[data-prot]'); if(!b) return; const a = b.dataset.prot;
+    if(a==='crear' || a==='cambiar' || a==='faceid'){ cerrar(); mostrarBloqueo(a); }
+    else if(a==='quitarfid'){ delete registro.wraps.faceid; try{ escribir(KEYC, JSON.stringify(registro)); toast('Face ID quitado. Puedes borrar la llave "Libreta" en la app Contraseñas.'); }catch(x){ toast(errMsg(x)); } pintarProteccion(); }
+    else if(a==='bloquear'){ cerrar(); bloquear(); }
+  });
   const ready = new Promise(r => setTimeout(r, 0)).then(init);
 
   /* ---------- fechas ---------- */
@@ -1186,7 +1405,8 @@ button{cursor:pointer}
     $('btnAddLbl').textContent = state.sec==='gastos' ? 'Apuntar' : 'Apuntar operación';
     try{ RENDER[tab](); }catch(e){ console.error(e); }
     $('status').textContent = store && store.ok === false ? 'Este navegador no deja guardar datos (¿navegación privada?). Lo que apuntes se perderá al cerrar.'
-      : 'Tus datos se guardan solo en este dispositivo. La libreta no envía nada a ningún servidor.';
+      : protegido() ? 'Tus datos están cifrados y solo en este dispositivo. La libreta no envía nada a ningún servidor.'
+      : 'Tus datos se guardan solo en este dispositivo, sin proteger. Puedes ponerle contraseña en Ajustes.';
   }
   document.querySelector('.secsw').addEventListener('click', e => {
     const b = e.target.closest('.secbtn'); if(!b) return;
@@ -2039,10 +2259,10 @@ button{cursor:pointer}
   function abrirAjustes(){
     $('aPres').value = toInput(state.prefs.presupuesto);
     $('aIng').value = toInput(state.prefs.ingresoMensual);
-    restoreData = null; $('aRestoreMsg').hidden = true; $('aRestoreRow').hidden = true;
+    restoreData = null; restoreCifrada = null; $('aRestoreMsg').hidden = true; $('aRestoreRow').hidden = true; $('aRestorePassWrap').hidden = true; $('aRestorePass').value = '';
     importData = null; $('aImportMsg').hidden = true; $('aImportRow').hidden = true;
     $('aWipeBox').hidden = true; $('aWipeRow').hidden = false;
-    $('aMon').value = state.prefs.moneda || 'EUR';
+    $('aMon').value = state.prefs.moneda || 'EUR'; pintarProteccion();
     $('aErr').textContent = ''; ['aNewGasto','aNewIngreso','aNewInversion','aNewCuenta'].forEach(id => { $(id).value = ''; });
     borrador = {cats: cats().map(c => Object.assign({}, c)), cuentas: cuentas().map(c => Object.assign({}, c)), principal: principalId()};
     pintarAjustes();
@@ -2293,33 +2513,119 @@ button{cursor:pointer}
     catch(err){ if(err && err.code !== 'declined') $('aErr').textContent = 'No se pudo exportar ahora mismo.'; }
   });
   let restoreData = null;
-  async function hacerCopia(){
-    const data = JSON.stringify({app:'libreta-gastos', version:2, exportado: new Date().toISOString(), prefs: state.prefs, movimientos: state.movs, productos: state.productos, operaciones: state.ops, precios: state.precios}, null, 1);
-    try{
-      await downloads.save({filename: 'libreta-copia-' + hoyISO() + '.json', data});
-      await store.setPrefs(Object.assign({}, state.prefs, {ultimaCopia: hoyISO()}));
-      toast('Copia lista: guárdala en Archivos o iCloud Drive');
-    }catch(err){ if(err && err.code !== 'declined') toast('No se pudo hacer la copia ahora mismo.'); }
+  // cifrado: PBKDF2-SHA256 (600.000 vueltas) + AES-GCM de 256 bits, con la Web Crypto del propio navegador
+  const ITER = 600000;
+  function b64(buf){ const b = new Uint8Array(buf); let t = ''; for(let i = 0; i < b.length; i += 0x8000) t += String.fromCharCode.apply(null, b.subarray(i, i+0x8000)); return btoa(t); }
+  function unb64(t){ const bin = atob(t), b = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b; }
+  async function claveDe(pass, salt, iter){
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations: iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
   }
+  async function cifrar(texto, pass){
+    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const k = await claveDe(pass, salt, ITER);
+    const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, k, new TextEncoder().encode(texto));
+    return JSON.stringify({app:'libreta-gastos', version:2, exportado: new Date().toISOString(), cifrado:{alg:'AES-GCM-256', kdf:'PBKDF2-SHA256', iter: ITER, salt: b64(salt), iv: b64(iv)}, datos: b64(ct)});
+  }
+  async function descifrar(d, pass){
+    const c = d.cifrado || {};
+    if(c.modo === 'app'){
+      const w = c.pass || {};
+      if(!(w.iter > 0 && w.iter <= 5000000) || !w.salt || !d.iv || typeof d.datos !== 'string') throw new Error('formato');
+      const k = await importarLlave(await desenvolver(await claveDe(pass, unb64(w.salt), w.iter), w));
+      const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv: unb64(d.iv)}, k, unb64(d.datos));
+      return JSON.parse(new TextDecoder().decode(pt));
+    }
+    if(!(c.iter > 0 && c.iter <= 5000000) || !c.salt || !c.iv || typeof d.datos !== 'string') throw new Error('formato');
+    const k = await claveDe(pass, unb64(c.salt), c.iter);
+    const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv: unb64(c.iv)}, k, unb64(d.datos));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }
+  const puedeCifrar = () => !!(window.crypto && crypto.subtle && window.isSecureContext !== false);
+  const datosCopia = () => JSON.stringify({app:'libreta-gastos', version:2, exportado: new Date().toISOString(), prefs: state.prefs, movimientos: state.movs, productos: state.productos, operaciones: state.ops, precios: state.precios});
+  let copiaLista = null;
+  function hacerCopia(){
+    copiaLista = null; $('kPass').value = ''; $('kPass2').value = ''; $('kErr').textContent = ''; $('kApp').hidden = !(protegido() && llaveK);
+    $('kPaso1').hidden = false; $('kPaso2').hidden = true; $('kCifrar').disabled = false; $('kCifrar').textContent = 'Cifrar copia';
+    abrir($('sheetCopia'), $('kPass'));
+  }
+  function copiaPreparada(data, cifrada){
+    copiaLista = {data, cifrada};
+    $('kPaso1').hidden = true; $('kPaso2').hidden = false;
+    const kb = Math.max(1, Math.round(data.length/1024));
+    $('kListo').innerHTML = cifrada ? `<b>Copia cifrada y lista</b> (${kb} KB). Toca Guardar en Archivos y elige iCloud Drive. Para restaurarla te pedirá la contraseña.`
+      : `<b>Copia sin contraseña lista</b> (${kb} KB). Cualquiera que tenga el archivo podrá leer tus datos.`;
+  }
+  $('formCopia').addEventListener('submit', async e => {
+    e.preventDefault();
+    const p1 = $('kPass').value, p2 = $('kPass2').value;
+    if(p1.length < 8){ $('kErr').textContent = 'Usa una contraseña de al menos 8 caracteres.'; $('kPass').focus(); return; }
+    if(p1 !== p2){ $('kErr').textContent = 'Las dos contraseñas no coinciden.'; $('kPass2').focus(); return; }
+    if(!puedeCifrar()){ $('kErr').textContent = 'Este navegador no permite cifrar aquí. Abre la app desde su dirección https.'; return; }
+    $('kCifrar').disabled = true; $('kCifrar').textContent = 'Cifrando…'; $('kErr').textContent = '';
+    try{ copiaPreparada(await cifrar(datosCopia(), p1), true); }
+    catch(err){ $('kErr').textContent = 'No se pudo cifrar la copia. Vuelve a intentarlo.'; }
+    finally{ $('kCifrar').disabled = false; $('kCifrar').textContent = 'Cifrar copia'; $('kPass').value = ''; $('kPass2').value = ''; }
+  });
+  $('kSin').addEventListener('click', () => copiaPreparada(datosCopia(), false));
+  $('kUsarApp').addEventListener('click', async () => {
+    if(!llaveK || !registro) return;
+    try{
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, llaveK, new TextEncoder().encode(datosCopia()));
+      copiaPreparada(JSON.stringify({app:'libreta-gastos', version:2, exportado: new Date().toISOString(), cifrado:{modo:'app', alg:'AES-GCM-256', pass: registro.wraps.pass}, iv: b64(iv), datos: b64(ct)}), true);
+    }catch(x){ $('kErr').textContent = 'No se pudo cifrar la copia.'; }
+  });
+  $('kCancel').addEventListener('click', () => { copiaLista = null; cerrar(); });
+  $('kGuardar').addEventListener('click', async () => {
+    if(!copiaLista) return;
+    const c = copiaLista;
+    try{
+      await downloads.save({filename: 'libreta-copia-' + hoyISO() + (c.cifrada ? '-cifrada' : '') + '.json', data: c.data});
+      await store.setPrefs(Object.assign({}, state.prefs, {ultimaCopia: hoyISO()}));
+      copiaLista = null; cerrar(); toast('Copia lista: comprueba que se ha guardado en Archivos');
+    }catch(err){ if(err && err.code !== 'declined') toast('No se pudo guardar la copia ahora mismo.'); }
+  });
   $('aBackup').addEventListener('click', hacerCopia);
+  let restoreCifrada = null;
+  function mostrarRestore(d){
+    if(d.app !== 'libreta-gastos' || !Array.isArray(d.movimientos)) throw 0;
+    restoreData = d;
+    const nuevos = d.movimientos.filter(m => m && m.id && !state.movs.some(x => x.id===m.id)).length;
+    const extra = (d.productos||[]).length ? `, ${(d.productos||[]).length} productos y ${(d.operaciones||[]).length} operaciones` : '';
+    $('aRestoreMsg').textContent = `Copia del ${(d.exportado||'').slice(0,10) || 'archivo'}: ${d.movimientos.length} movimientos (${nuevos} que no están en tu libreta)${extra}. Se añadirá lo que falte y se recuperarán tus ajustes, cuentas y conceptos. No se borra nada.`;
+    $('aRestoreMsg').hidden = false; $('aRestoreRow').hidden = false; $('aRestorePassWrap').hidden = true;
+  }
   $('aRestore').addEventListener('change', () => {
     const f = $('aRestore').files[0]; if(!f) return;
     const r = new FileReader();
     r.onload = () => {
-      $('aRestore').value = '';
+      $('aRestore').value = ''; restoreData = null; restoreCifrada = null; $('aRestoreRow').hidden = true;
       try{
         const d = JSON.parse(r.result);
-        if(d.app !== 'libreta-gastos' || !Array.isArray(d.movimientos)) throw 0;
-        restoreData = d;
-        const nuevos = d.movimientos.filter(m => m && m.id && !state.movs.some(x => x.id===m.id)).length;
-        const extra = (d.productos||[]).length ? `, ${(d.productos||[]).length} productos y ${(d.operaciones||[]).length} operaciones` : '';
-        $('aRestoreMsg').textContent = `Copia del ${(d.exportado||'').slice(0,10) || 'archivo'}: ${d.movimientos.length} movimientos (${nuevos} que no están en tu libreta)${extra}. Se añadirá lo que falte y se recuperarán tus ajustes, cuentas y conceptos. No se borra nada.`;
-        $('aRestoreMsg').hidden = false; $('aRestoreRow').hidden = false;
-      }catch(e){ restoreData = null; $('aRestoreMsg').textContent = 'Ese archivo no es una copia de la libreta.'; $('aRestoreMsg').hidden = false; $('aRestoreRow').hidden = true; }
+        if(d && d.app === 'libreta-gastos' && d.cifrado){
+          restoreCifrada = d;
+          $('aRestoreMsg').textContent = `Copia cifrada del ${(d.exportado||'').slice(0,10) || 'archivo'}. Escribe su contraseña para abrirla.`;
+          $('aRestoreMsg').hidden = false; $('aRestorePassWrap').hidden = false; $('aRestorePass').value = ''; $('aRestorePass').focus();
+          return;
+        }
+        mostrarRestore(d);
+      }catch(e){ restoreData = null; $('aRestoreMsg').textContent = 'Ese archivo no es una copia de la libreta.'; $('aRestoreMsg').hidden = false; $('aRestoreRow').hidden = true; $('aRestorePassWrap').hidden = true; }
     };
     r.readAsText(f);
   });
-  $('aRestoreNo').addEventListener('click', () => { restoreData = null; $('aRestoreMsg').hidden = true; $('aRestoreRow').hidden = true; });
+  async function abrirCifrada(){
+    if(!restoreCifrada) return;
+    if(!puedeCifrar()){ $('aRestoreMsg').textContent = 'Este navegador no permite descifrar aquí. Abre la app desde su dirección https.'; return; }
+    const pass = $('aRestorePass').value; if(!pass){ $('aRestorePass').focus(); return; }
+    $('aRestoreOpen').disabled = true; $('aRestoreOpen').textContent = 'Abriendo…';
+    try{ const d = await descifrar(restoreCifrada, pass); restoreCifrada = null; $('aRestorePass').value = ''; mostrarRestore(d); }
+    catch(e){ $('aRestoreMsg').textContent = 'Contraseña incorrecta o archivo dañado. Vuelve a intentarlo.'; }
+    finally{ $('aRestoreOpen').disabled = false; $('aRestoreOpen').textContent = 'Abrir copia'; }
+  }
+  $('aRestoreOpen').addEventListener('click', abrirCifrada);
+  $('aRestorePass').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); abrirCifrada(); } });
+  $('aRestoreNo').addEventListener('click', () => { restoreData = null; restoreCifrada = null; $('aRestoreMsg').hidden = true; $('aRestoreRow').hidden = true; $('aRestorePassWrap').hidden = true; });
   $('aRestoreYes').addEventListener('click', async () => {
     if(!restoreData) return;
     const d = restoreData; restoreData = null;
