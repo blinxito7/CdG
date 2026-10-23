@@ -97,6 +97,11 @@ button{cursor:pointer}
 .monthnav{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .monthnav .iconbtn{width:34px;height:34px;background:var(--sunk);border-color:transparent}
 .monthname{font-family:var(--f-display);font-weight:600;font-size:16px}
+.monthname::after{content:"▾";font-size:12px;color:var(--muted);margin-left:6px}
+.monthpick{position:relative;display:inline-flex;align-items:center}
+.monthpick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:0;padding:0;margin:0;cursor:pointer;font-size:16px}
+.t tr[data-ym]{cursor:pointer}
+.t tr[data-ym]:hover td{background:var(--sunk)}
 .quad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .stat{background:var(--surface);padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -382,7 +387,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     <div class="card">
       <div class="monthnav">
         <button class="iconbtn" id="prevMes" aria-label="Mes anterior"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
-        <span class="monthname" id="mesNombre">—</span>
+        <span class="monthpick"><span class="monthname" id="mesNombre">—</span><input type="month" id="mesPick" aria-label="Elegir mes"></span>
         <button class="iconbtn" id="nextMes" aria-label="Mes siguiente"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
       <div class="quad" id="quad"></div>
@@ -409,7 +414,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
       <div class="legend-line"><span><i class="sq" style="--c:var(--ok)"></i>Ahorro</span><span><i class="sq" style="--c:var(--inv)"></i>Invertido</span><span><i class="sq" style="--c:var(--over)"></i>Mes en negativo</span></div>
     </div>
     <div class="card">
-      <div class="eyebrow">Mes a mes · en euros</div>
+      <div class="eyebrow">Mes a mes · en euros · toca un mes para verlo y editarlo</div>
       <div class="twrap"><table class="t" id="hTabla"></table></div>
     </div>
     <div class="card" id="hAnual"></div>
@@ -530,7 +535,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
       <div class="field"><label for="fCuenta" id="fCuentaLbl">Pagado desde</label><select id="fCuenta"></select></div>
       <div class="field" id="fDestWrap" hidden><label for="fDest">Hacia</label><select id="fDest"></select></div>
     </div>
-    <p class="note" id="fInvNote" hidden>Se resta del saldo de la cuenta, pero cuenta como ahorro, no como gasto. Si quieres seguir su rentabilidad, apúntalo como compra en Inversiones (con esta cuenta) en vez de aquí.</p>
+    <div class="wipebox" id="fInvNote" hidden style="border-color:color-mix(in srgb, var(--inv) 40%, var(--line));background:var(--inv-soft)"><p class="note">Este movimiento no tiene producto: cuenta como inversión del mes, pero la app no sabe cuánto rinde.</p><div class="actions"><button type="button" class="btn small" id="fAOp">Pasar a Inversiones con producto</button></div></div>
     <div class="two">
       <div class="field"><label for="fNota">Nota</label><input id="fNota" maxlength="80" placeholder="Opcional" autocomplete="off"></div>
       <div class="field"><label for="fFecha">Fecha</label><input id="fFecha" type="date"></div>
@@ -1433,7 +1438,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     $('saldoSub').innerHTML = sub;
 
     const st = mesStats(mes);
-    $('mesNombre').textContent = nombreMes(mes);
+    $('mesNombre').textContent = nombreMes(mes); $('mesPick').value = mes;
     $('quad').innerHTML = stat(fmt(st.i), 'Cobrado') + stat(fmt(st.g), 'Gastado') + stat(fmt(Math.abs(st.v)), st.v < 0 ? 'Desinvertido' : 'Invertido', 'inv')
       + stat(fmtS(st.a), st.tasa != null ? 'Ahorro · ' + fmtPct(st.tasa) : 'Ahorro', st.a < 0 ? 'neg' : st.a > 0 ? 'pos' : '');
 
@@ -1595,9 +1600,10 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     }
     dibujarHist(filas);
     $('hTabla').innerHTML = `<thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Invertido</th><th>Ahorro</th><th>Tasa</th></tr></thead><tbody>${
-      filas.slice().reverse().map(f => `<tr class="${f.parcial?'cur':''}"><td>${esc(mesCorto(f.ym))}${f.parcial?'<small>en curso</small>':''}</td><td>${esc(fmtT(f.i))}</td><td>${esc(fmtT(f.g))}</td><td class="invc">${esc(fmtT(f.v))}</td><td class="${f.a<0?'neg':''}">${esc(fmtT(f.a, true))}</td><td>${esc(fmtPct(f.tasa))}</td></tr>`).join('')}</tbody>`;
+      filas.slice().reverse().map(f => `<tr class="${f.parcial?'cur':''}" data-ym="${f.ym}"><td>${esc(mesCorto(f.ym))}${f.parcial?'<small>en curso</small>':''}</td><td>${esc(fmtT(f.i))}</td><td>${esc(fmtT(f.g))}</td><td class="invc">${esc(fmtT(f.v))}</td><td class="${f.a<0?'neg':''}">${esc(fmtT(f.a, true))}</td><td>${esc(fmtPct(f.tasa))}</td></tr>`).join('')}</tbody>`;
     renderAnual();
   };
+  $('hTabla').addEventListener('click', e => { const tr = e.target.closest('tr[data-ym]'); if(!tr) return; state.mes = tr.dataset.ym; state.tab.gastos = 'mes'; ls.set('libreta-tab-g', 'mes'); render(); window.scrollTo({top:0}); });
   $('hPer').addEventListener('click', e => { const b = e.target.closest('.pill'); if(!b) return; state.hPer = b.dataset.v; RENDER.historico(); });
   function aniosConDatos(){ return [...new Set(mesesConDatos().map(k => k.slice(0,4)))].sort(); }
   function statsAnio(y){
@@ -2030,7 +2036,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     $('fCuentaLbl').textContent = t==='ingreso' || t==='devolucion' ? 'Cobrado en' : t==='traspaso' ? 'Desde' : t==='aportacion' ? 'Sale de' : 'Pagado desde';
     $('fRefWrap').hidden = t!=='devolucion';
     $('fDestWrap').hidden = t!=='traspaso';
-    $('fInvNote').hidden = t!=='aportacion';
+    $('fInvNote').hidden = !(t==='aportacion' && editId);
     if(t!=='traspaso') llenarSelect(sel || ultimaCat[tipoCatDe(t)]);
     if(t==='devolucion') llenarRef(ref || null);
     refCambiado();
@@ -2040,7 +2046,13 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     if(t==='traspaso'){ const d = dest || (cuentas().find(c => !c.archivada && c.id !== $('fCuenta').value) || {}).id; $('fDest').innerHTML = opcionesCuentas(d); if(d) $('fDest').value = d; }
     $('fDevRow').hidden = !(editId && t==='gasto');
   }
-  $('fTipo').addEventListener('click', e => { const b = e.target.closest('button'); if(b && b.dataset.v !== fTipo) setTipo(b.dataset.v); });
+  const presetDesdeMov = () => ({cuenta: $('fCuenta').value || principalId(), fecha: $('fFecha').value || hoyISO(), importe: parseImporte($('fImporte').value), nota: $('fNota').value.trim()});
+  $('fTipo').addEventListener('click', e => {
+    const b = e.target.closest('button'); if(!b || b.dataset.v === fTipo) return;
+    if(b.dataset.v === 'aportacion' && !editId){ abrirOp(null, presetDesdeMov()); return; }
+    setTipo(b.dataset.v);
+  });
+  $('fAOp').addEventListener('click', () => { if(!editId) return; abrirOp(null, Object.assign(presetDesdeMov(), {convertir: editId})); });
   $('fCat').addEventListener('change', () => {
     $('fNewWrap').hidden = $('fCat').value !== '__new';
     if($('fCat').value==='__new'){ $('fNew').focus(); return; }
@@ -2060,7 +2072,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     $('fCur').textContent = simbolo();
     $('fErr').textContent = '';
     $('fDel').hidden = !m; desarmar();
-    if(!m && !preset && (fTipo==='devolucion' || fTipo==='traspaso')) fTipo = 'gasto';
+    if(!m && !preset && (fTipo==='devolucion' || fTipo==='traspaso' || fTipo==='aportacion')) fTipo = 'gasto';
     const t = m ? tipoDe(m) : (preset ? preset.tipo : fTipo);
     let cuenta = m ? cuentaDe(m) : null;
     if(!m && preset && preset.ref){ const o = idx().get(preset.ref); if(o) cuenta = cuentaDe(o); }
@@ -2168,7 +2180,8 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     $('cRows').innerHTML = lista.map(c => {
       const t = conceptoTotales(cierreYM, c), cu = cuentaById(c.cuenta || principalId());
       const val = toInputS(t.total);
-      const extra = t.daily ? ` · ya apuntado ${fmt(t.daily)}` : '';
+      let extra = t.daily ? ` · ya apuntado ${fmt(t.daily)}` : '';
+      if(c.tipo==='inversion'){ const enOps = state.ops.filter(o => o.cuenta && o.fecha && mesDe(o.fecha)===cierreYM && catDeProd(prodById(o.producto))===c.id).reduce((s,o) => s + ((o.tipo==='compra'||o.tipo==='aportacion') ? o.importe : (o.tipo==='venta'||o.tipo==='retirada') ? -o.importe : 0), 0); if(enOps) extra += ` · ${fmt(enOps)} ya en Inversiones, no lo repitas`; }
       return `<div class="crow" style="--c:${catColor(c)}"><span class="n"><b><i class="dot ${c.tipo==='inversion'?'diamond':''}"></i><span>${esc(c.nombre)}</span></b><small>${esc(cu.nombre + (c.tipo==='mixto' ? ' · ±' : c.tipo==='ingreso' ? ' · ingreso' : c.tipo==='inversion' ? ' · inversión' : '') + extra)}</small></span><input data-cat="${esc(c.id)}" id="c-${esc(c.id)}" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(val)}" aria-label="Total de ${esc(c.nombre)}"></div>`;
     }).join('');
     const guardados = (state.prefs.cierres[cierreYM] || {}).saldos || {};
@@ -2838,12 +2851,16 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     const r = leerOp(), cu = $('oCuenta').value;
     $('oTotal').textContent = (oTipo==='compra' || oTipo==='venta') ? (r.importe != null ? (oTipo==='compra' ? 'Total pagado: ' : 'Total cobrado: ') + fmt(r.importe) + (r.com ? ' (comisión incluida)' : '') : 'El total se calcula con participaciones × precio ± comisión.') : '';
     $('oTotal').hidden = !(oTipo==='compra' || oTipo==='venta');
+    if(!opId && opPreset && opPreset.importe && (oTipo==='compra' || oTipo==='venta')){
+      $('oTotal').textContent += ' Importe que apuntaste: ' + fmt(opPreset.importe) + '.';
+      if(r.pr && !$('oUnid').value){ const cm = r.com || 0; $('oUnid').placeholder = '≈ ' + toDecInput(Math.max(0, (opPreset.importe - cm)/100/r.pr)); } else $('oUnid').placeholder = 'Ej. 12,3456';
+    }
     const entra = oTipo==='venta' || oTipo==='dividendo';
     $('oCuentaNote').textContent = cu ? (entra ? `Suma al saldo de ${cuentaById(cu).nombre}${oTipo==='venta' ? ' y cuenta como desinversión del mes' : ' y cuenta como ingreso del mes'}.` : `Resta del saldo de ${cuentaById(cu).nombre} y cuenta como inversión del mes. Si ya lo apuntaste en Control de gastos como Inversión, elige Ninguna.`) : (entra ? 'No cambia el saldo de tus cuentas.' : 'No cambia el saldo de tus cuentas ni la inversión del mes: úsalo para lo que ya tenías antes de empezar.');
   }
   $('oTipo').addEventListener('click', e => { const b = e.target.closest('button'); if(b && b.dataset.v !== oTipo) setOTipo(b.dataset.v); });
   $('oProd').addEventListener('change', () => {
-    if($('oProd').value==='__new'){ abrirProd(null, {volverOp: {op: opId ? state.ops.find(x => x.id===opId) : null, preset: {tipo: oTipo}}}); return; }
+    if($('oProd').value==='__new'){ abrirProd(null, {volverOp: {op: opId ? state.ops.find(x => x.id===opId) : null, preset: Object.assign({}, opPreset, {tipo: oTipo})}}); return; }
     const p = prodById($('oProd').value);
     if(p && !cotiza(p) && (oTipo==='compra' || oTipo==='venta')) setOTipo('aportacion');
     else if(p && cotiza(p) && oTipo==='aportacion') setOTipo('compra');
@@ -2852,7 +2869,9 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   function prefillPrecio(){ const p = prodById($('oProd').value); if(p && cotiza(p) && !$('oPrecio').value){ const pr = precioEn(p.id, $('oFecha').value || hoyISO()); if(pr) $('oPrecio').placeholder = 'Último: ' + toDecInput(pr.precio); } }
   $('formOp').addEventListener('input', actualizarOp);
   $('oCuenta').addEventListener('change', actualizarOp);
+  let opPreset = null;
   function abrirOp(o, preset){
+    opPreset = o ? null : (preset || null);
     if(!o && !state.productos.some(p => !p.archivado) && !(preset && preset.producto)){ abrirProd(null, {volverOp: {op:null, preset: preset || {}}}); toast('Primero crea el producto'); return; }
     opId = o ? o.id : null;
     $('tOp').textContent = o ? 'Editar operación' : 'Nueva operación';
@@ -2861,12 +2880,12 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     $('oUnid').value = o && o.unidades ? toDecInput(o.unidades) : '';
     $('oPrecio').value = o && o.precio ? toDecInput(o.precio) : ''; $('oPrecio').placeholder = 'Ej. 41,27';
     $('oCom').value = o && o.comision ? toInput(o.comision) : '';
-    $('oImp').value = o && !o.unidades ? toInput(o.importe) : '';
-    $('oFecha').value = o ? o.fecha : hoyISO();
-    $('oNota').value = o ? (o.nota||'') : '';
+    $('oImp').value = o && !o.unidades ? toInput(o.importe) : (preset && preset.importe ? toInput(preset.importe) : '');
+    $('oFecha').value = o ? o.fecha : (preset && preset.fecha) || hoyISO();
+    $('oNota').value = o ? (o.nota||'') : (preset && preset.nota) || '';
     $('oErr').textContent = ''; opDesarmar(); $('oDel').hidden = !o;
     const t = o ? o.tipo : preset && preset.tipo ? preset.tipo : (p && !cotiza(p) ? 'aportacion' : 'compra');
-    oTipo = t; llenarOCuenta(o ? (o.cuenta || '') : null);
+    oTipo = t; llenarOCuenta(o ? (o.cuenta || '') : (preset && preset.cuenta != null ? preset.cuenta : null));
     setOTipo(t === 'retirada' ? 'venta' : t);
     prefillPrecio();
     abrir($('sheetOp'), null);
@@ -2896,7 +2915,9 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
         await store.put('precios', r.p.id + '~' + fecha, {producto: r.p.id, fecha, precio: r.pr, origen:'operacion', confirmado:true, creado: Date.now()});
       }
       ls.set('libreta-ult-prod', r.p.id); ls.set('libreta-ult-cuenta-op', data.cuenta);
-      cerrar(); toast(prev ? 'Operación actualizada' : (OP_TXT[oTipo] + ' apuntada: ' + fmt(r.importe)));
+      const conv = !prev && opPreset && opPreset.convertir; if(conv) await store.remove('gastos', conv);
+      opPreset = null;
+      cerrar(); toast(prev ? 'Operación actualizada' : conv ? 'Pasado a Inversiones' : (OP_TXT[oTipo] + ' apuntada: ' + fmt(r.importe)));
     }catch(err){ $('oErr').textContent = errMsg(err); }
     finally{ $('oSave').disabled = false; }
   });
@@ -2908,6 +2929,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   });
 
   /* ---------- mes ---------- */
+  $('mesPick').addEventListener('change', () => { const v = $('mesPick').value; if(/^\d{4}-\d{2}$/.test(v)){ state.mes = v; render(); } });
   $('prevMes').addEventListener('click', () => { state.mes = shiftMes(state.mes, -1); render(); });
   $('nextMes').addEventListener('click', () => { state.mes = shiftMes(state.mes, 1); render(); });
 
