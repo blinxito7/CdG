@@ -215,6 +215,10 @@ button{cursor:pointer}
 .twrap{overflow-x:auto;margin:0 -4px;padding:0 4px}
 .t{width:100%;border-collapse:collapse;font-size:13.5px;min-width:340px}
 .t.narrow{min-width:0}
+#fcMeses{font-size:12.5px}
+#fcMeses td,#fcMeses th{padding-left:3px;padding-right:3px}
+#fcMeses th{font-size:10px;letter-spacing:.03em}
+#fcMeses input{width:20px;height:20px;accent-color:var(--accent)}
 .t th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:right;padding:0 6px 8px;white-space:nowrap}
 .t th:first-child,.t td:first-child{text-align:left}
 .t td{border-top:1px solid var(--line);padding:9px 6px;vertical-align:top;text-align:right;font-family:var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -367,10 +371,11 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     <button class="tab" role="tab" data-tab="sectores" aria-selected="false">Sectores</button>
     <button class="tab" role="tab" data-tab="prevision" aria-selected="false">Previsión</button>
   </nav>
-  <nav class="tabs" id="tabsI" role="tablist" aria-label="Inversiones" hidden>
+  <nav class="tabs four" id="tabsI" role="tablist" aria-label="Inversiones" hidden>
     <button class="tab" role="tab" data-tab="resumen" aria-selected="false">Resumen</button>
     <button class="tab" role="tab" data-tab="productos" aria-selected="false">Productos</button>
-    <button class="tab" role="tab" data-tab="operaciones" aria-selected="false">Operaciones</button>
+    <button class="tab" role="tab" data-tab="operaciones" aria-selected="false">Historial</button>
+    <button class="tab" role="tab" data-tab="iprev" aria-selected="false">Previsión</button>
   </nav>
 
   <!-- MES -->
@@ -443,25 +448,38 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   <section class="panel" id="p-prevision" role="tabpanel" hidden>
     <div class="card">
       <div>
-        <div class="eyebrow">Patrimonio previsto en 12 meses</div>
+        <div class="eyebrow">Ahorro previsto en 12 meses</div>
         <div class="hero" id="fcHero">—</div>
       </div>
       <div class="sub" id="fcSub"></div>
       <div class="chart" id="fcChart"></div>
-      <div class="legend-line" id="fcLegend"><span><i></i>Real</span><span><i class="proj"></i>Previsto</span><span id="fcBandLbl"><i class="band"></i>Rango probable</span></div>
+      <div class="legend-line" id="fcLegend"><span><i></i>Saldo real de tus cuentas</span><span><i class="proj"></i>Saldo previsto</span><span id="fcBandLbl"><i class="band"></i>Rango probable</span></div>
     </div>
     <div class="card">
-      <table class="fc-table" id="fcTable"></table>
+      <div class="twrap"><table class="t narrow" id="fcTable"></table></div>
     </div>
     <div class="card">
-      <div class="eyebrow">Supuestos de la previsión</div>
-      <div class="assump">
-        <div class="field"><label for="fcI">Ingresos / mes</label><input id="fcI" inputmode="decimal" autocomplete="off"></div>
-        <div class="field"><label for="fcG">Gastos / mes</label><input id="fcG" inputmode="decimal" autocomplete="off"></div>
-        <div class="field"><label for="fcInf">Subida gastos %/año</label><input id="fcInf" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+      <div class="eyebrow">KPIs de la previsión</div>
+      <div class="kpis" id="fcKpis"></div>
+      <p class="note">Cada cifra es la media de los meses que aparecen más abajo. Escribe otra si sabes que va a cambiar, como una subida de sueldo o un préstamo que terminas. Deja el campo vacío para volver a la media.</p>
+      <b style="font-size:14px">Ingresos al mes</b>
+      <div class="crows" id="fcIng"></div>
+      <b style="font-size:14px">Gastos al mes</b>
+      <div class="crows" id="fcGas"></div>
+      <b style="font-size:14px">Lo que inviertes al mes</b>
+      <div class="crows"><div class="crow"><span class="n"><b><i class="dot diamond" style="--c:var(--inv)"></i><span>Inversión</span></b><small id="fcInvMedia"></small></span><input id="fcInv" inputmode="decimal" autocomplete="off" aria-label="Inversión prevista al mes"></div></div>
+      <div class="two eq">
+        <div class="field"><label for="fcSubI">Subida ingresos %/año</label><input id="fcSubI" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+        <div class="field"><label for="fcSubG">Subida gastos %/año</label><input id="fcSubG" inputmode="decimal" autocomplete="off" placeholder="0"></div>
       </div>
       <p class="fc-note" id="fcBase"></p>
-      <div><button type="button" class="linkbtn" id="fcReset">Volver a los valores de tu historial</button></div>
+      <div><button type="button" class="linkbtn" id="fcReset">Volver a la media histórica</button></div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Meses que se han tenido en cuenta</div>
+      <div class="seg" id="fcPer"></div>
+      <div class="twrap"><table class="t narrow" id="fcMeses"></table></div>
+      <p class="note">Desmarca los meses atípicos, como uno con paga extra o una avería grande, para que no tuerzan la media.</p>
     </div>
   </section>
 
@@ -484,6 +502,39 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
       <div class="prods" id="prodList"></div>
       <div><button type="button" class="btn small" data-act="addprod">Añadir producto</button></div>
       <p class="note" id="precioNota"></p>
+    </div>
+  </section>
+
+  <!-- INVERSIONES: PREVISIÓN -->
+  <section class="panel" id="p-iprev" role="tabpanel" hidden>
+    <div class="card">
+      <div>
+        <div class="eyebrow">Inversiones previstas en 12 meses</div>
+        <div class="hero" id="ipHero">—</div>
+      </div>
+      <div class="sub" id="ipSub"></div>
+      <div class="chart" id="ipChart"></div>
+      <div class="legend-line"><span><i class="sq" style="--c:var(--inv)"></i>Fondos, ETF, acciones y otros</span><span><i class="sq" style="--c:var(--s3)"></i>Inmuebles</span><span><i class="sq" style="--c:var(--muted);opacity:.45"></i>Zona clara: previsto</span></div>
+    </div>
+    <div class="card">
+      <div class="twrap"><table class="t narrow" id="ipTabla"></table></div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Supuestos de la previsión</div>
+      <b style="font-size:14px">Fondos, ETF, acciones y otros</b>
+      <div id="ipRent" class="panel" style="gap:8px"></div>
+      <div class="two eq">
+        <div class="field"><label for="ipAA">Aportas / mes</label><input id="ipAA" inputmode="decimal" autocomplete="off"></div>
+        <div class="field"><label for="ipRA">Rentabilidad %/año</label><input id="ipRA" inputmode="decimal" autocomplete="off"></div>
+      </div>
+      <b style="font-size:14px">Inmuebles</b>
+      <div class="assump">
+        <div class="field"><label for="ipAI">Pagas / mes</label><input id="ipAI" inputmode="decimal" autocomplete="off"></div>
+        <div class="field"><label for="ipMI">Nº de meses</label><input id="ipMI" inputmode="numeric" autocomplete="off"></div>
+        <div class="field"><label for="ipRI">Sube %/año</label><input id="ipRI" inputmode="decimal" autocomplete="off"></div>
+      </div>
+      <p class="fc-note" id="ipBase"></p>
+      <div><button type="button" class="linkbtn" id="ipReset">Volver a los valores de tu historial</button></div>
     </div>
   </section>
 
@@ -842,7 +893,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   function devPorRef(excluir){ const r = {}; state.movs.forEach(x => { if(tipoDe(x)==='devolucion' && x.ref && x.id !== excluir) r[x.ref] = (r[x.ref]||0) + (x.importe||0); }); return r; }
   const ls = { get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
 
-  const TABS = {gastos:['mes','historico','sectores','prevision'], inversiones:['resumen','productos','operaciones']};
+  const TABS = {gastos:['mes','historico','sectores','prevision'], inversiones:['resumen','productos','operaciones','iprev']};
   const ALL_TABS = TABS.gastos.concat(TABS.inversiones);
   const state = {
     movs: [], ops: [], productos: [], precios: [], prefs: normalizePrefs(null), mes: mesDe(hoyISO()), modo:'cargando',
@@ -1743,73 +1794,181 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
   $('pieWrap').addEventListener('click', e => { const p = e.target.closest('path'); if(p) toggleSel(p.dataset.id); else if(state.pieSel){ state.pieSel=null; RENDER.sectores(); } });
   $('pieLegend').addEventListener('click', e => { const b = e.target.closest('.lrow'); if(b) toggleSel(b.dataset.id); });
 
-  /* ---------- Previsión ---------- */
+  /* ---------- Previsión de Control de gastos: medias del histórico, editables ---------- */
   const HORIZ = [{k:6,n:'6 meses'},{k:12,n:'12 meses'},{k:24,n:'2 años'},{k:36,n:'3 años'},{k:48,n:'4 años'},{k:60,n:'5 años'}];
-  function baseHistorial(){
-    const map = porMes(), act = mesDe(hoyISO());
-    const meses = Object.keys(map).filter(k => k < act && (map[k].i || map[k].g)).sort();
-    let usados = [];
-    if(meses.length){ let m = shiftMes(act,-1); const primero = meses[0]; while(m >= primero && usados.length < 12){ usados.push(m); m = shiftMes(m,-1); } }
-    if(usados.length){
-      const vals = usados.map(k => map[k] || VACIO);
-      const ultimo = meses[meses.length-1], u = map[ultimo], pl = planDe(ultimo);
-      const I = u.i || pl.gana, G = u.g || pl.pres;
-      const relleno = [!u.i && pl.gana ? 'ingresos' : '', !u.g && pl.pres ? 'gastos' : ''].filter(Boolean);
-      let sd = 0;
-      if(vals.length >= 3){ const nets = vals.map(v=>v.i-v.g), mu = nets.reduce((s,x)=>s+x,0)/nets.length; sd = Math.sqrt(nets.reduce((s,x)=>s+(x-mu)*(x-mu),0)/(nets.length-1)); }
-      return {I, G, sd, n: usados.length, modo:'hist', mes: ultimo, relleno};
-    }
-    const cur = map[act] || VACIO, dia = new Date().getDate(), dm = diasMes(act);
-    return {I: cur.i, G: Math.round(cur.g/dia*dm), sd:0, n:0, modo: (cur.i||cur.g) ? 'actual' : 'vacio'};
+  function fechaHoriz(k){ const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+k); return MES_C[d.getMonth()]+' '+d.getFullYear(); }
+  const PER_PREV = [{id:6,n:'6 meses'},{id:12,n:'12 meses'},{id:24,n:'24 meses'},{id:'todo',n:'Todo'}];
+  const cfgPrev = () => state.prefs.prevGas || {};
+  function modeloPrev(){
+    const cfg = cfgPrev(), per = cfg.per || 12, act = mesDe(hoyISO()), map = porMes();
+    const datos = Object.keys(map).filter(k => k < act && (map[k].i || map[k].g || map[k].v)).sort();
+    const meses = [];
+    if(datos.length){ let m = shiftMes(act, -1); while(m >= datos[0] && (per === 'todo' || meses.length < per)){ meses.unshift(m); m = shiftMes(m, -1); } }
+    const excl = new Set(cfg.excl || []), usados = meses.filter(m => !excl.has(m)), n = usados.length;
+    const sum = {ing:{}, gas:{}}; let inv = 0;
+    usados.forEach(m => { const o = map[m] || VACIO; Object.keys(o.ic).forEach(k => { sum.ing[k] = (sum.ing[k]||0) + o.ic[k]; }); Object.keys(o.gc).forEach(k => { sum.gas[k] = (sum.gas[k]||0) + o.gc[k]; }); inv += o.v; });
+    const filas = t => { const ed = cfg[t] || {}; return [...new Set(Object.keys(sum[t]).concat(Object.keys(ed)))].map(id => { const media = n ? Math.round((sum[t][id]||0)/n) : 0; return {id, c: catById(id), media, prev: ed[id] != null ? ed[id] : media, editado: ed[id] != null}; }).filter(f => f.media || f.editado).sort((a,b) => b.media - a.media); };
+    const ing = filas('ing'), gas = filas('gas'), mediaInv = n ? Math.round(inv/n) : 0;
+    const I = ing.reduce((s,f) => s + f.prev, 0), G = gas.reduce((s,f) => s + f.prev, 0), V = cfg.inv != null ? cfg.inv : mediaInv;
+    const mI = ing.reduce((s,f) => s + f.media, 0), mG = gas.reduce((s,f) => s + f.media, 0);
+    let sd = 0;
+    if(n >= 3){ const nets = usados.map(m => { const o = map[m] || VACIO; return o.i - o.g; }), mu = nets.reduce((s,x)=>s+x,0)/n; sd = Math.sqrt(nets.reduce((s,x)=>s+(x-mu)*(x-mu),0)/(n-1)); }
+    return {cfg, per, meses, excl, usados, n, ing, gas, I, G, V, mI, mG, mediaInv, subI: cfg.subI || 0, subG: cfg.subG || 0, sd, map};
   }
-  function proyectar(I, G, inf, saldo0, sd){
-    const pts = [{k:0, s:saldo0, lo:saldo0, hi:saldo0}];
-    let s = saldo0;
-    for(let k=1; k<=60; k++){ s += I - G*Math.pow(1+inf/100, (k-1)/12); const w = sd*Math.sqrt(k); pts.push({k, s:Math.round(s), lo:Math.round(s-w), hi:Math.round(s+w)}); }
+  function proyectarPrev(M){
+    const s0 = liquidezHasta(hoyISO()), pts = [{k:0, acum:0, s:s0, lo:s0, hi:s0}];
+    let acum = 0, s = s0;
+    for(let k = 1; k <= 60; k++){
+      const f = (k-1)/12, a = M.I*Math.pow(1 + M.subI/100, f) - M.G*Math.pow(1 + M.subG/100, f);
+      acum += a; s += a - M.V; const w = M.sd*Math.sqrt(k);
+      pts.push({k, acum: Math.round(acum), s: Math.round(s), lo: Math.round(s-w), hi: Math.round(s+w)});
+    }
     return pts;
   }
-  function historialPatrimonio(){
-    const serie = seriePatrimonio(13), n = serie.length;
-    return serie.slice(0, n-1).map((p, i) => ({k: i-(n-1), s: p.total}));
-  }
-  function fechaHoriz(k){ const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+k); return MES_C[d.getMonth()]+' '+d.getFullYear(); }
   let fcPts = [], fcHist = [];
   RENDER.prevision = function(){
-    const b = baseHistorial();
-    const gana = state.prefs.ingresoMensual||0, pres = state.prefs.presupuesto||0;
-    const baseI = b.modo==='hist' ? b.I : (gana || b.I), baseG = b.modo==='hist' ? b.G : (pres || b.G);
-    const I = state.fc.I ?? baseI, G = state.fc.G ?? baseG, inf = state.fc.inf ?? 0;
-    if(document.activeElement !== $('fcI')) $('fcI').value = toInput(I) || '0';
-    if(document.activeElement !== $('fcG')) $('fcG').value = toInput(G) || '0';
-    if(document.activeElement !== $('fcInf')) $('fcInf').value = inf ? String(inf).replace('.',',') : '';
-    const editado = state.fc.I!==null || state.fc.G!==null;
-    const sd = editado ? 0 : b.sd;
-    const saldo0 = patrimonioHoy();
-    fcPts = proyectar(I, G, inf, saldo0, sd); fcHist = historialPatrimonio();
-    const s12 = fcPts[12].s;
-    $('fcHero').textContent = fmt(s12);
-    $('fcHero').classList.toggle('neg', s12 < 0);
-    const ahorro = I - G;
-    $('fcSub').innerHTML = `Hoy tienes <span class="num">${esc(fmt(saldo0))}</span> entre cuentas e inversiones. Al ritmo actual ${ahorro>=0?'ahorras':'pierdes'} <b class="num ${ahorro<0?'neg':''}">${esc(fmt(Math.abs(ahorro)))}</b> al mes. No cuenta lo que rindan tus inversiones.`;
-    let base;
-    if(b.modo==='hist'){
-      base = `Repite cada mes lo de ${nombreMes(b.mes).toLowerCase()}, tu último mes completo: cobrado ${fmt(b.I)} y gastado ${fmt(b.G)}. Lo que inviertes no cuenta como gasto.`;
-      if(b.relleno.length) base += ` Ese mes no tiene ${b.relleno.join(' ni ')} apuntados, así que uso tu plan.`;
-      if(b.n >= 3) base += ` El rango probable sale de cómo han variado tus últimos ${b.n} meses.`;
-    } else {
-      const fuenteI = gana ? 'Ingresos: lo que ganas al mes (Ajustes).' : (b.I ? 'Ingresos: lo cobrado este mes.' : '');
-      const fuenteG = pres ? 'Gastos: tu límite mensual.' : (b.modo==='actual' ? 'Gastos: lo que llevas este mes, llevado a mes entero.' : '');
-      base = (fuenteI || fuenteG) ? 'Aún no hay un mes completo con datos. ' + [fuenteI, fuenteG].filter(Boolean).join(' ')
-        : 'Aún no hay datos. Pon en Ajustes lo que ganas y tu límite de gasto, o escribe aquí tus cifras para simular.';
+    const M = modeloPrev(), panel = $('p-prevision'), foco = document.activeElement;
+    $('fcPer').innerHTML = PER_PREV.map(p => `<button type="button" class="pill" data-v="${p.id}" aria-pressed="${String(p.id)===String(M.per)}">${p.n}</button>`).join('');
+    if(!M.meses.length){
+      $('fcHero').textContent = '—'; $('fcSub').textContent = 'Cuando tengas al menos un mes completo apuntado, aquí verás la previsión calculada con tu histórico.';
+      ['fcChart','fcTable','fcKpis','fcIng','fcGas','fcMeses'].forEach(id => { $(id).innerHTML = ''; }); $('fcBase').textContent = ''; return;
     }
-    $('fcBase').textContent = editado ? 'Estás usando tus propios supuestos.' : base;
-    $('fcBandLbl').hidden = !sd;
-    $('fcTable').innerHTML = `<thead><tr><th>Plazo</th><th>Patrimonio previsto</th><th>Cambio</th></tr></thead><tbody>${
-      HORIZ.map(h => { const p = fcPts[h.k], d = p.s - saldo0;
-        return `<tr><td><span class="h">${h.n}</span><small>${fechaHoriz(h.k)}</small></td><td class="num">${esc(fmt(p.s))}${sd?`<small>${esc(fmtK(p.lo))} a ${esc(fmtK(p.hi))}</small>`:''}</td><td class="num ${d<0?'neg':d>0?'pos':''}">${esc(fmtS(d))}</td></tr>`;
-      }).join('')}</tbody>`;
-    dibujarGrafico(sd);
+    if(!(foco && panel.contains(foco) && foco.tagName==='INPUT' && foco.type !== 'checkbox')){
+      $('fcMeses').innerHTML = `<thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Invert.</th><th>Ahorro</th><th>Usar</th></tr></thead><tbody>${M.meses.slice().reverse().map(m => { const st = statsDe(M.map[m]), usa = !M.excl.has(m); return `<tr class="${usa?'':'cur'}"><td>${esc(mesCorto(m))}</td><td>${esc(fmtT(st.i))}</td><td>${esc(fmtT(st.g))}</td><td class="invc">${esc(fmtT(st.v))}</td><td class="${st.a<0?'neg':''}">${esc(fmtT(st.a, true))}</td><td><input type="checkbox" data-mes="${m}" ${usa?'checked':''} aria-label="Usar ${esc(nombreMes(m))}"></td></tr>`; }).join('')}</tbody>`;
+      const fila = (t, f) => `<div class="crow"><span class="n"><b><i class="dot" style="--c:${catColor(f.c)}"></i><span>${esc(f.c.nombre)}</span></b><small>media ${esc(fmt(f.media))}</small></span><input data-prev="${t}" data-id="${esc(f.id)}" id="pv-${t}-${esc(f.id)}" inputmode="decimal" autocomplete="off" placeholder="${esc(toInputS(f.media) || '0')}" value="${f.editado ? esc(toInputS(f.prev) || '0') : ''}" aria-label="${esc(f.c.nombre)}: previsto al mes"></div>`;
+      $('fcIng').innerHTML = M.ing.length ? M.ing.map(f => fila('ing', f)).join('') : '<p class="note">Sin ingresos en los meses elegidos.</p>';
+      $('fcGas').innerHTML = M.gas.length ? M.gas.map(f => fila('gas', f)).join('') : '<p class="note">Sin gastos en los meses elegidos.</p>';
+      $('fcInv').placeholder = toInput(M.mediaInv) || '0'; $('fcInv').value = M.cfg.inv != null ? (toInput(M.cfg.inv) || '0') : '';
+      $('fcSubI').value = M.cfg.subI != null ? String(M.cfg.subI).replace('.', ',') : '';
+      $('fcSubG').value = M.cfg.subG != null ? String(M.cfg.subG).replace('.', ',') : '';
+    }
+    $('fcInvMedia').textContent = 'media ' + fmt(M.mediaInv);
+    pintarPrev(M);
   };
+  function pintarPrev(M){
+    fcPts = proyectarPrev(M);
+    const serie = serieMeses(13);
+    fcHist = serie.slice(0, serie.length-1).map((ym, i, arr) => ({k: i - arr.length, s: liquidezHasta(finMes(ym))}));
+    const a = M.I - M.G, p12 = fcPts[12], tasa = M.I > 0 ? a/M.I : null, mA = M.mI - M.mG;
+    $('fcHero').textContent = fmtS(p12.acum); $('fcHero').classList.toggle('neg', p12.acum < 0);
+    $('fcSub').innerHTML = `Con estos KPIs ahorras <b class="num ${a<0?'neg':''}">${esc(fmtS(a))}</b> al mes${tasa != null ? ' (tasa ' + esc(fmtPct(tasa)) + ')' : ''}. Tus cuentas pasarían de <span class="num">${esc(fmt(fcPts[0].s))}</span> hoy a <b class="num">${esc(fmt(p12.s))}</b> en 12 meses${M.V ? ', después de invertir ' + esc(fmt(M.V)) + ' al mes' : ''}.`;
+    const dif = (v, m) => v === m ? 'media del histórico' : 'media ' + fmt(m);
+    $('fcKpis').innerHTML = `<div class="kpi"><span class="k">Ingresos / mes</span><span class="v">${esc(fmt(M.I))}</span><small>${esc(dif(M.I, M.mI))}</small></div>
+      <div class="kpi"><span class="k">Gastos / mes</span><span class="v">${esc(fmt(M.G))}</span><small>${esc(dif(M.G, M.mG))}</small></div>
+      <div class="kpi"><span class="k">Ahorro / mes · ${esc(fmtPct(tasa))}</span><span class="v ${a<0?'neg':'pos'}">${esc(fmtS(a))}</span><small>${esc(dif(a, mA))}</small></div>
+      <div class="kpi"><span class="k">Inversión / mes</span><span class="v inv">${esc(fmt(M.V))}</span><small>${esc(dif(M.V, M.mediaInv))}</small></div>`;
+    const ini = M.usados[0], fin = M.usados[M.usados.length-1];
+    $('fcBase').textContent = (M.n ? `Base: ${M.n} ${M.n===1?'mes':'meses'} (${mesCorto(ini)} a ${mesCorto(fin)})${M.excl.size ? `, sin ${M.excl.size} excluido${M.excl.size>1?'s':''}` : ''}. ` : 'Has excluido todos los meses: no hay media. ')
+      + (M.n >= 3 ? 'El rango probable sale de cómo ha variado tu ahorro de un mes a otro.' : 'Con menos de 3 meses no se calcula el rango probable.')
+      + (M.subG || M.subI ? '' : ' Sin subidas: los ingresos y gastos se mantienen igual los 5 años; pon la inflación que esperas en "Subida gastos".');
+    $('fcBandLbl').hidden = !M.sd;
+    $('fcTable').innerHTML = `<thead><tr><th>Plazo</th><th>Ahorrado</th><th>En cuentas</th></tr></thead><tbody>${HORIZ.map(h => { const q = fcPts[h.k]; return `<tr><td>${esc(h.n)}<small>${esc(fechaHoriz(h.k))}</small></td><td class="${q.acum<0?'neg':''}">${esc(fmtT(q.acum, true))}</td><td>${esc(fmtT(q.s))}${M.sd ? `<small>${esc(fmtK(q.lo))} a ${esc(fmtK(q.hi))}</small>` : ''}</td></tr>`; }).join('')}</tbody>`;
+    dibujarGrafico(M.sd);
+  }
+  /* ---------- Inversiones: previsión (activos e inmuebles por separado) ---------- */
+  const esInmuebleCat = cid => cid === 'inv_inmu';
+  function valorGruposEn(iso){
+    let a = 0, i = 0;
+    state.productos.forEach(p => { const v = valorDe(p, replay(p.id, iso), iso).valor; if(claseDeProd(p)==='inmueble') i += v; else a += v; });
+    state.movs.forEach(m => { if(tipoDe(m)==='aportacion' && m.fecha && m.fecha <= iso){ if(esInmuebleCat(m.cat)) i += m.importe||0; else a += m.importe||0; } });
+    return {a, i};
+  }
+  function aportacionMedia(){
+    const map = porMes(), act = mesDe(hoyISO());
+    const meses = Object.keys(map).filter(k => k < act && (map[k].v || map[k].i || map[k].g)).sort();
+    if(!meses.length) return {a:0, i:0, n:0};
+    let m = shiftMes(act, -1), n = 0, a = 0, i = 0;
+    while(m >= meses[0] && n < 12){ const o = map[m]; if(o) Object.keys(o.vc).forEach(c => { if(esInmuebleCat(c)) i += o.vc[c]; else a += o.vc[c]; }); n++; m = shiftMes(m, -1); }
+    return {a: Math.round(a/n), i: Math.round(i/n), n};
+  }
+  function rentMedia(){
+    const bolsa = state.productos.filter(p => claseDeProd(p)==='bolsa');
+    if(!bolsa.length) return null;
+    const cb = cartera(p => claseDeProd(p)==='bolsa');
+    const filas = bolsa.map(p => ({p, c: prodCalc(p)})).filter(x => x.c.aportado > 0);
+    const pct = cb.tir != null && isFinite(cb.tir) ? Math.round(cb.tir*1000)/10 : null;
+    return {pct, dias: cb.dias, valor: cb.valor, filas};
+  }
+  function supuestosInv(){
+    const base = aportacionMedia(), g = state.prefs.prevInv || {};
+    const v = (k, def) => g[k] != null && isFinite(g[k]) ? g[k] : def;
+    return {base, AA: v('AA', Math.max(0, base.a)), RA: v('RA', (rentMedia() || {}).pct ?? 4), AI: v('AI', Math.max(0, base.i)), MI: v('MI', 60), RI: v('RI', 0), propios: Object.keys(g).some(k => g[k] != null)};
+  }
+  let ipPts = [], ipHist = [];
+  RENDER.iprev = function(){
+    const hoy = hoyISO(), S = supuestosInv(), ahora = valorGruposEn(hoy);
+    const set = (id, val) => { if(document.activeElement !== $(id)) $(id).value = val; };
+    set('ipAA', toInput(S.AA) || '0'); set('ipAI', toInput(S.AI) || '0'); set('ipRA', String(S.RA).replace('.', ',')); set('ipRI', String(S.RI).replace('.', ',')); set('ipMI', String(S.MI));
+    if(!ahora.a && !ahora.i && !S.AA && !S.AI){
+      $('ipHero').textContent = '—'; $('ipSub').textContent = 'Cuando tengas inversiones o pagos del piso apuntados, aquí verás cómo pueden crecer.'; $('ipChart').innerHTML = ''; $('ipTabla').innerHTML = ''; $('ipBase').textContent = ''; return;
+    }
+    const ra = Math.pow(1 + S.RA/100, 1/12), ri = Math.pow(1 + S.RI/100, 1/12);
+    ipPts = [{k:0, a:ahora.a, i:ahora.i, ap:0}];
+    let a = ahora.a, i = ahora.i, ap = 0;
+    for(let k = 1; k <= 60; k++){ const pi = k <= S.MI ? S.AI : 0; a = a*ra + S.AA; i = i*ri + pi; ap += S.AA + pi; ipPts.push({k, a: Math.round(a), i: Math.round(i), ap}); }
+    const serie = serieMeses(25), act = mesDe(hoy), n = serie.length;
+    ipHist = serie.slice(0, n-1).map((ym, idx) => { const v = valorGruposEn(finMes(ym)); return {k: idx-(n-1), a: v.a, i: v.i}; });
+    const p12 = ipPts[12], p60 = ipPts[60];
+    $('ipHero').textContent = fmt(p12.a + p12.i);
+    $('ipSub').innerHTML = `Hoy: activos <b class="num">${esc(fmt(ahora.a))}</b> · inmuebles <b class="num">${esc(fmt(ahora.i))}</b>. En 5 años: <b class="num">${esc(fmt(p60.a + p60.i))}</b>, de los que <span class="num">${esc(fmt(p60.ap))}</span> serían nuevas aportaciones.`;
+    const H = [{k:0, n:'Hoy'}].concat(HORIZ);
+    $('ipTabla').innerHTML = `<thead><tr><th>Plazo</th><th>Activos</th><th>Inmuebles</th><th>Total</th></tr></thead><tbody>${H.map(h => { const q = ipPts[h.k]; return `<tr><td>${esc(h.n)}${h.k ? '<small>' + esc(fechaHoriz(h.k)) + '</small>' : ''}</td><td class="invc">${esc(fmtT(q.a))}</td><td>${esc(fmtT(q.i))}</td><td>${esc(fmtT(q.a + q.i))}</td></tr>`; }).join('')}</tbody>`;
+    const bAA = S.base.n ? `Aportaciones: la media de tus últimos ${S.base.n} ${S.base.n===1?'mes':'meses'} (${fmt(S.base.a)} a activos y ${fmt(S.base.i)} a inmuebles).` : 'Aún no hay meses completos con aportaciones: escribe tus cifras.';
+    const rm = rentMedia();
+    $('ipRent').innerHTML = rm && rm.pct != null ? `<div class="planrow"><span>Rentabilidad media de tus activos</span><b class="num ${rm.pct<0?'neg':'pos'}">${esc(fmtPct(rm.pct/100, true))} al año</b></div>
+      <div class="rank">${rm.filas.map(x => { const r = rendimientoTxt(x.c), peso = rm.valor ? x.c.valor/rm.valor : 0; return `<div class="r" style="--c:var(--inv)"><i class="dot"></i><span class="n">${esc(x.p.nombre)}</span><span class="a">${esc(r.v)}</span><span class="d">${esc((peso*100).toLocaleString('es-ES',{maximumFractionDigits:0}))} %</span></div>`; }).join('')}</div>
+      <p class="note">Es la TIR conjunta de tus ${rm.filas.length} ${rm.filas.length===1?'producto':'productos'}: pesa más lo que tiene más dinero y más tiempo invertido. A la derecha, el peso de cada uno en la cartera.${rm.dias < 365 ? ' Llevas menos de un año invirtiendo: una rentabilidad anualizada con tan poca historia puede estar muy lejos de la real.' : ''}</p>`
+      : '<p class="note">Cuando tengas compras y un valor actualizado de tus fondos, ETF o acciones, aquí saldrá su rentabilidad media y se usará en la previsión. Mientras, se usa un 4 % anual.</p>';
+    $('ipBase').textContent = (S.propios ? 'Estás usando tus propios supuestos. ' : bAA + ' ') + 'La rentabilidad pasada no garantiza la futura: úsala como referencia y ajústala si te parece alta o baja. Los inmuebles se valoran por lo pagado salvo que pongas revalorización.';
+    dibujarIP();
+  };
+  function dibujarIP(){
+    const wrap = $('ipChart');
+    const W = Math.max(300, Math.round(wrap.clientWidth || 320)), H = 220, ml = 44, mr = 10, mt = 14, mb = 24;
+    const k0 = ipHist.length ? ipHist[0].k : 0, todos = ipHist.concat(ipPts);
+    const ticks = niceTicks(0, Math.max(1, ...todos.map(p => p.a + p.i)), 4), lo = ticks[0], hi = ticks[ticks.length-1];
+    const x = k => ml + (k - k0)/(60 - k0)*(W - ml - mr), y = v => mt + (1 - (v - lo)/(hi - lo))*(H - mt - mb);
+    let g = '';
+    ticks.forEach(t => { g += `<line x1="${ml}" x2="${W-mr}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}" stroke="var(--line)" stroke-width="${t===0?1.5:1}" ${t===0?'':'stroke-dasharray="2 3"'}/><text class="ax" x="${ml-6}" y="${(y(t)+3.5).toFixed(1)}" text-anchor="end">${esc(fmtK(t))}</text>`; });
+    const area = (pts, top, base, color, op) => { if(pts.length < 2) return ''; const up = pts.map(p => `${x(p.k).toFixed(1)},${y(top(p)).toFixed(1)}`), dn = pts.slice().reverse().map(p => `${x(p.k).toFixed(1)},${y(base(p)).toFixed(1)}`); return `<polygon points="${up.concat(dn).join(' ')}" fill="${color}" opacity="${op}"/>`; };
+    const linea = (pts, f, color, dash) => pts.length < 2 ? '' : `<polyline points="${pts.map(p => `${x(p.k).toFixed(1)},${y(f(p)).toFixed(1)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2" ${dash ? 'stroke-dasharray="5 4"' : ''} stroke-linejoin="round"/>`;
+    const real = ipHist.concat([ipPts[0]]);
+    g += area(real, p => p.i, () => 0, 'var(--s3)', .55) + area(real, p => p.i + p.a, p => p.i, 'var(--inv)', .55);
+    g += area(ipPts, p => p.i, () => 0, 'var(--s3)', .22) + area(ipPts, p => p.i + p.a, p => p.i, 'var(--inv)', .22);
+    g += linea(real, p => p.i + p.a, 'var(--inv)') + linea(ipPts, p => p.i + p.a, 'var(--inv)', true) + linea(ipPts, p => p.i, 'var(--s3)', true) + linea(real, p => p.i, 'var(--s3)');
+    g += `<line x1="${x(0).toFixed(1)}" x2="${x(0).toFixed(1)}" y1="${mt-6}" y2="${H-mb}" stroke="var(--muted)" stroke-width="1" opacity=".5"/>`;
+    const xt = [{k:0,n:'hoy'},{k:12,n:'1a'},{k:24,n:'2a'},{k:36,n:'3a'},{k:48,n:'4a'},{k:60,n:'5a'}];
+    if(k0 <= -6) xt.unshift({k:k0, n: (k0 <= -24 ? '−2a' : k0 <= -12 ? '−1a' : k0+'m')});
+    xt.forEach(t => { g += `<text class="ax" x="${x(t.k).toFixed(1)}" y="${H-6}" text-anchor="${t.k===60?'end':t.k===k0?'start':'middle'}">${t.n}</text>`; });
+    g += `<g id="ipHover" visibility="hidden"><line id="ipHl" y1="${mt-6}" y2="${H-mb}" stroke="var(--ink)" stroke-width="1"/></g><rect x="${ml}" y="0" width="${W-ml-mr}" height="${H}" fill="transparent" id="ipHit"/>`;
+    wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución y previsión de tus inversiones">${g}</svg><div class="tip" id="ipTip" hidden></div>`;
+    const svg = wrap.querySelector('svg');
+    function mover(ev){
+      const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * (W / r.width);
+      const k = Math.max(k0, Math.min(60, Math.round(k0 + (px - ml)/(W - ml - mr)*(60 - k0))));
+      const p = todos.find(q => q.k===k); if(!p) return;
+      $('ipHover').setAttribute('visibility','visible'); $('ipHl').setAttribute('x1', x(k)); $('ipHl').setAttribute('x2', x(k));
+      const tip = $('ipTip'); tip.hidden = false;
+      tip.innerHTML = `${k===0 ? 'Hoy' : esc(fechaHoriz(k)) + (k<0 ? ' (real)' : '')}<br>Activos <b>${esc(fmt(p.a))}</b><br>Inmuebles <b>${esc(fmt(p.i))}</b>`;
+      tip.style.left = Math.max(70, Math.min(r.width - 70, x(k) * (r.width / W))) + 'px';
+    }
+    const hit = $('ipHit'); hit.addEventListener('pointermove', mover); hit.addEventListener('pointerdown', mover);
+    hit.addEventListener('pointerleave', () => { $('ipHover').setAttribute('visibility','hidden'); $('ipTip').hidden = true; });
+  }
+  function leerIP(){
+    const g = Object.assign({}, state.prefs.prevInv || {});
+    const imp = id => { const v = $(id).value.trim(); const c = v ? parseImporte(v, true) : 0; return c === null ? undefined : c; };
+    const pct = id => { const n = parseFloat($(id).value.trim().replace(',', '.')); return isFinite(n) ? Math.max(-50, Math.min(50, n)) : undefined; };
+    const aa = imp('ipAA'), ai = imp('ipAI'), ra = pct('ipRA'), rI = pct('ipRI'), mi = parseInt($('ipMI').value, 10);
+    if(aa !== undefined) g.AA = aa; if(ai !== undefined) g.AI = ai; if(ra !== undefined) g.RA = ra; if(rI !== undefined) g.RI = rI; if(isFinite(mi)) g.MI = Math.max(0, Math.min(600, mi));
+    return g;
+  }
+  ['ipAA','ipAI','ipRA','ipRI','ipMI'].forEach(id => {
+    $(id).addEventListener('input', () => { state.prefs = Object.assign({}, state.prefs, {prevInv: leerIP()}); RENDER.iprev(); });
+    $(id).addEventListener('change', async () => { try{ await ready; await store.setPrefs(Object.assign({}, state.prefs, {prevInv: leerIP()})); }catch(e){} });
+  });
+  $('ipReset').addEventListener('click', async () => { const p = Object.assign({}, state.prefs); delete p.prevInv; try{ await ready; await store.setPrefs(p); }catch(e){} });
+
   function dibujarGrafico(sd){
     const wrap = $('fcChart');
     const W = Math.max(280, Math.round(wrap.clientWidth || 320)), H = 220;
@@ -1839,7 +1998,7 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     g += `<circle cx="${x(0).toFixed(1)}" cy="${y(fcPts[0].s).toFixed(1)}" r="4.5" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/>`;
     g += `<g id="fcHover" visibility="hidden"><line id="fcHl" y1="${mt-6}" y2="${H-mb}" stroke="var(--ink)" stroke-width="1"/><circle id="fcHc" r="5" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/></g>`;
     g += `<rect x="${ml}" y="0" width="${W-ml-mr}" height="${H}" fill="transparent" id="fcHit"/>`;
-    wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución prevista del patrimonio a 5 años">${g}</svg><div class="tip" id="fcTip" hidden></div>`;
+    wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Saldo previsto de tus cuentas a 5 años">${g}</svg><div class="tip" id="fcTip" hidden></div>`;
     const svg = wrap.querySelector('svg'), serie = fcHist.concat(fcPts);
     function mover(ev){
       const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * (W / r.width);
@@ -1857,17 +2016,23 @@ body.bloqueada .app, body.bloqueada .bar-bottom, body.bloqueada .scrim, body.cub
     const hit = $('fcHit');
     hit.addEventListener('pointermove', mover); hit.addEventListener('pointerdown', mover); hit.addEventListener('pointerleave', salir);
   }
-  let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { const t = state.tab[state.sec]; if(['prevision','historico','resumen'].includes(t)) RENDER[t](); }, 150); });
-  function leerSupuesto(id, campo){
-    const v = $(id).value.trim();
-    if(campo==='inf'){ const n = parseFloat(v.replace(',','.')); state.fc.inf = isFinite(n) ? Math.max(-20, Math.min(50, n)) : 0; }
-    else { const c = parseImporte(v, true); if(c !== null) state.fc[campo] = c; }
-    RENDER.prevision();
+  let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { const t = state.tab[state.sec]; if(['prevision','historico','resumen','iprev'].includes(t)) RENDER[t](); }, 150); });
+  function leerPrevInputs(){
+    const cfg = Object.assign({}, cfgPrev()); cfg.ing = Object.assign({}, cfg.ing); cfg.gas = Object.assign({}, cfg.gas);
+    document.querySelectorAll('#p-prevision input[data-prev]').forEach(inp => { const t = inp.dataset.prev, id = inp.dataset.id, v = inp.value.trim(); if(!v){ delete cfg[t][id]; return; } const c = parseImporte(v, true, true); if(c !== null) cfg[t][id] = c; });
+    const iv = $('fcInv').value.trim(); if(!iv) delete cfg.inv; else { const c = parseImporte(iv, true); if(c !== null) cfg.inv = c; }
+    [['subI','fcSubI'],['subG','fcSubG']].forEach(([k, id]) => { const v = $(id).value.trim(); if(!v) delete cfg[k]; else { const n = parseFloat(v.replace(',', '.')); if(isFinite(n)) cfg[k] = Math.max(-50, Math.min(50, n)); } });
+    return cfg;
   }
-  $('fcI').addEventListener('input', () => leerSupuesto('fcI','I'));
-  $('fcG').addEventListener('input', () => leerSupuesto('fcG','G'));
-  $('fcInf').addEventListener('input', () => leerSupuesto('fcInf','inf'));
-  $('fcReset').addEventListener('click', () => { state.fc = {I:null,G:null,inf:null}; RENDER.prevision(); });
+  async function guardarPrev(cfg){ try{ await ready; await store.setPrefs(Object.assign({}, state.prefs, {prevGas: cfg})); }catch(e){ toast(errMsg(e)); } }
+  const esCampoPrev = el => el.matches('input[data-prev], #fcInv, #fcSubI, #fcSubG');
+  $('p-prevision').addEventListener('input', e => { if(!esCampoPrev(e.target)) return; state.prefs = Object.assign({}, state.prefs, {prevGas: leerPrevInputs()}); pintarPrev(modeloPrev()); });
+  $('p-prevision').addEventListener('change', e => {
+    if(e.target.matches('input[data-mes]')){ const cfg = Object.assign({}, cfgPrev()), ex = new Set(cfg.excl || []); if(e.target.checked) ex.delete(e.target.dataset.mes); else ex.add(e.target.dataset.mes); cfg.excl = [...ex]; guardarPrev(cfg); return; }
+    if(esCampoPrev(e.target)) guardarPrev(leerPrevInputs());
+  });
+  $('fcPer').addEventListener('click', e => { const b = e.target.closest('.pill'); if(!b) return; const v = b.dataset.v; guardarPrev(Object.assign({}, cfgPrev(), {per: v === 'todo' ? 'todo' : +v})); });
+  $('fcReset').addEventListener('click', () => { const c = cfgPrev(); guardarPrev({per: c.per, excl: c.excl}); });
 
   /* ---------- Inversiones: Resumen ---------- */
   const PAL = n => 'var(--s' + (n % 8) + ')';
